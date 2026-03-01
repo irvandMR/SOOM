@@ -11,6 +11,7 @@ import java.util.UUID;
 
 @Setter
 @Getter
+@MappedSuperclass
 public abstract class BaseEntity {
     @Id
     @GeneratedValue
