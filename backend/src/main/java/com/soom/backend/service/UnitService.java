@@ -4,6 +4,7 @@ import com.soom.backend.dto.request.UnitRequest;
 import com.soom.backend.dto.response.UnitResponse;
 import com.soom.backend.entity.UnitsEntity;
 import com.soom.backend.repository.UnitRepository;
+import com.soom.backend.utils.AuthUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 public class UnitService {
 
     private final UnitRepository unitRepository;
+    private final AuthUtil authUtil;
 
     // GET ALL
     public List<UnitResponse> getAll() {
@@ -55,6 +57,7 @@ public class UnitService {
         UnitsEntity unit = new UnitsEntity();
         unit.setName(request.getName());
         unit.setSymbol(request.getSymbol());
+        unit.setCreatedBy(authUtil.getCurrentUserEmail());
 
         unitRepository.save(unit);
 
@@ -76,6 +79,7 @@ public class UnitService {
 
         unit.setName(request.getName());
         unit.setSymbol(request.getSymbol());
+        unit.setUpdatedBy(authUtil.getCurrentUserEmail());
 
         unitRepository.save(unit);
 
@@ -92,6 +96,7 @@ public class UnitService {
                 .orElseThrow(() -> new RuntimeException("Unit tidak ditemukan"));
 
         unit.setIsDeleted(true);
+        unit.setUpdatedBy(authUtil.getCurrentUserEmail());
         unitRepository.save(unit);
     }
 }
