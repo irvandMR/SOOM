@@ -2,6 +2,7 @@ package com.soom.backend.config;
 
 import com.soom.backend.middleware.JwtAuthFilter;
 import com.soom.backend.security.UserDetailsServiceImpl;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,6 +50,24 @@ public class SecurityConfig {
                             "/v3/api-docs/**"
                         ).permitAll()
                         .anyRequest().authenticated())
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write(
+                                    "{\"success\":false,\"message\":\"Sesi habis, silakan login ulang\",\"data\":null}"
+                            );
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.getWriter().write(
+                                    "{\"success\":false,\"message\":\"Akses ditolak\",\"data\":null}"
+                            );
+                        })
+                )
 
                 // Pasang JwtAuthFilter sebelum filter bawaan Spring Security
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
