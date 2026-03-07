@@ -1,7 +1,9 @@
 package com.soom.backend.controller;
 
 import com.soom.backend.dto.request.IngredientRequest;
+import com.soom.backend.dto.request.StockInRequest;
 import com.soom.backend.dto.response.BaseResponse;
+import com.soom.backend.dto.response.IngredientHistoryResponse;
 import com.soom.backend.dto.response.IngredientResponse;
 import com.soom.backend.service.IngredientService;
 import jakarta.validation.Valid;
@@ -64,6 +66,27 @@ public class IngredientController {
                 .success(true)
                 .message("Bahan baku berhasil dihapus")
                 .data(null)
+                .build());
+    }
+
+    @PostMapping("/{id}/stock-in")
+    public ResponseEntity<BaseResponse<IngredientResponse>> stockIn(
+            @PathVariable UUID id,
+            @Valid @RequestBody StockInRequest request) {
+        return ResponseEntity.ok(BaseResponse.<IngredientResponse>builder()
+                .success(true)
+                .message("Stok berhasil ditambahkan")
+                .data(ingredientService.stockIn(id, request))
+                .build());
+    }
+
+    @GetMapping("/{id}/history")
+    public ResponseEntity<BaseResponse<List<IngredientHistoryResponse>>> getHistory(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(BaseResponse.<List<IngredientHistoryResponse>>builder()
+                .success(true)
+                .message("OK")
+                .data(ingredientService.getHistory(id))
                 .build());
     }
 }

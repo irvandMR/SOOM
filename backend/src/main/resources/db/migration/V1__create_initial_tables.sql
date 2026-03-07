@@ -63,21 +63,21 @@ CREATE INDEX idx_ingredients_name
 CREATE INDEX idx_ingredients_not_deleted
     ON ingredients(is_deleted);
 
-CREATE TABLE ingredients_stock_histories (
-     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-     ingredient_id uuid NOT NULL,
-     type varchar(50) NOT NULL,
-     quantity decimal(12,3) NOT NULL,
-     purchase_price decimal(15,3),
-     notes text null,
-     reference_id uuid,
-     reference_type varchar(50),
-     created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-     created_by varchar(50) DEFAULT 'SYSTEM',
-     updated_at timestamp,
-     updated_by varchar(50),
-     is_deleted boolean DEFAULT false
-);
+    CREATE TABLE ingredients_stock_histories (
+         id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+         ingredient_id uuid NOT NULL,
+         type varchar(50) NOT NULL,
+         quantity decimal(12,3) NOT NULL,
+         purchase_price decimal(15,3),
+         notes text null,
+         reference_id uuid,
+         reference_type varchar(50),
+         created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+         created_by varchar(50) DEFAULT 'SYSTEM',
+         updated_at timestamp,
+         updated_by varchar(50),
+         is_deleted boolean DEFAULT false
+    );
 
 ALTER TABLE ingredients_stock_histories
     ADD CONSTRAINT fk_stock_history_ingredient

@@ -1,17 +1,23 @@
 package com.soom.backend.service;
 
 import com.soom.backend.dto.request.IngredientRequest;
+import com.soom.backend.dto.request.StockInRequest;
 import com.soom.backend.dto.response.IngredientResponse;
+import com.soom.backend.dto.response.IngredientHistoryResponse;
 import com.soom.backend.entity.CategoryEntity;
+import com.soom.backend.entity.IngredientHistoryEntity;
 import com.soom.backend.entity.IngredientsEntity;
 import com.soom.backend.entity.UnitsEntity;
 import com.soom.backend.repository.CategoryRepository;
+import com.soom.backend.repository.IngredientHistoryRepository;
 import com.soom.backend.repository.IngredientRepository;
 import com.soom.backend.repository.UnitRepository;
 import com.soom.backend.utils.AuthUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +29,7 @@ public class IngredientService {
     private final CategoryRepository categoryRepository;
     private final UnitRepository unitRepository;
     private final AuthUtil authUtil;
+    private final IngredientHistoryRepository ingredientHistoryRepository;
 
     public List<IngredientResponse> getAll() {
         return ingredientRepository.findByIsDeletedFalse()
@@ -95,6 +102,54 @@ public class IngredientService {
             throw new RuntimeException("Bahan baku tidak ditemukan");
         }
         return ingredient;
+    }
+
+    public IngredientResponse stockIn(UUID id, StockInRequest request) {
+        IngredientsEntity ingredient = findById(id);
+
+        // Simpan history
+        IngredientHistoryEntity history = new IngredientHistoryEntity();
+        history.setIngredients(ingredient);
+        history.setType("IN");
+        history.setQuantity(request.getQuantity());
+        history.setPurchasePrice(request.getPurchasePrice());
+        history.setNotes(request.getNotes());
+
+        ingredientHistoryRepository.save(history);
+
+        // Update stok & avg price di ingredient
+        BigDecimal oldStock = ingredient.getStockQuantity();
+        BigDecimal newStock = oldStock.add(request.getQuantity());
+
+        // Hitung moving average price
+        BigDecimal oldTotal = oldStock.multiply(ingredient.getAvgPurchasePrice());
+        BigDecimal newTotal = request.getQuantity().multiply(request.getPurchasePrice());
+        BigDecimal newAvgPrice = oldTotal.add(newTotal).divide(newStock, 3, RoundingMode.HALF_UP);
+
+        ingredient.setStockQuantity(newStock);
+        ingredient.setAvgPurchasePrice(newAvgPrice);
+        ingredientRepository.save(ingredient);
+
+        return toResponse(ingredient);
+    }
+
+    public List<IngredientHistoryResponse> getHistory(UUID id) {
+        findById(id); // validasi ingredient ada
+
+        return ingredientHistoryRepository
+                .findByIngredientIdAndIsDeletedFalse(id)
+                .stream()
+                .map(h -> IngredientHistoryResponse.builder()
+                        .id(h.getId())
+                        .type(h.getType())
+                        .quantity(h.getQuantity())
+                        .purchasePrice(h.getPurchasePrice())
+                        .notes(h.getNotes())
+                        .referenceType(h.getReferenceType())
+                        .referenceId(h.getReferenceId())
+                        .createdAt(h.getCreatedAt())
+                        .build())
+                .toList();
     }
 
     private IngredientResponse toResponse(IngredientsEntity ingredient) {
