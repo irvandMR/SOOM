@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +28,7 @@ public class UnitService {
                         .name(unit.getName())
                         .symbol(unit.getSymbol())
                         .build())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     // GET BY ID
