@@ -5,11 +5,11 @@ import com.soom.backend.dto.request.StockInRequest;
 import com.soom.backend.dto.response.IngredientResponse;
 import com.soom.backend.dto.response.IngredientHistoryResponse;
 import com.soom.backend.entity.CategoryEntity;
-import com.soom.backend.entity.IngredientHistoryEntity;
+import com.soom.backend.entity.IngredientStockHistoryEntity;
 import com.soom.backend.entity.IngredientsEntity;
 import com.soom.backend.entity.UnitsEntity;
 import com.soom.backend.repository.CategoryRepository;
-import com.soom.backend.repository.IngredientHistoryRepository;
+import com.soom.backend.repository.IngredientStockHistoryRepository;
 import com.soom.backend.repository.IngredientRepository;
 import com.soom.backend.repository.UnitRepository;
 import com.soom.backend.utils.AuthUtil;
@@ -29,7 +29,7 @@ public class IngredientService {
     private final CategoryRepository categoryRepository;
     private final UnitRepository unitRepository;
     private final AuthUtil authUtil;
-    private final IngredientHistoryRepository ingredientHistoryRepository;
+    private final IngredientStockHistoryRepository ingredientHistoryRepository;
 
     public List<IngredientResponse> getAll() {
         return ingredientRepository.findByIsDeletedFalse()
@@ -108,7 +108,7 @@ public class IngredientService {
         IngredientsEntity ingredient = findById(id);
 
         // Simpan history
-        IngredientHistoryEntity history = new IngredientHistoryEntity();
+        IngredientStockHistoryEntity history = new IngredientStockHistoryEntity();
         history.setIngredients(ingredient);
         history.setType("IN");
         history.setQuantity(request.getQuantity());
@@ -137,7 +137,7 @@ public class IngredientService {
         findById(id); // validasi ingredient ada
 
         return ingredientHistoryRepository
-                .findByIngredientIdAndIsDeletedFalse(id)
+                .findByIngredientsIdAndIsDeletedFalse(id)
                 .stream()
                 .map(h -> IngredientHistoryResponse.builder()
                         .id(h.getId())

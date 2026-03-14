@@ -19,9 +19,9 @@ public class OrderItemEntity extends BaseEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private OrderEntity order;
 
-    // product belum ada entitynya, pakai UUID dulu
-    @Column(name = "product_id", nullable = false)
-    private UUID productId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
+    private ProductEntity product;
 
     @Column(nullable = false)
     private BigDecimal quantity;

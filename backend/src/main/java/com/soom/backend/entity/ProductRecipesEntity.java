@@ -17,7 +17,7 @@ public class ProductRecipesEntity extends BaseEntity{
     private ProductEntity product;
 
     @Column(nullable = false)
-    private Integer versionNnumber;
+    private Integer versionNumber;
 
     private boolean isActive;
 
