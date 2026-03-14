@@ -1,6 +1,8 @@
 package com.soom.backend.exception;
 
 import com.soom.backend.dto.response.BaseResponse;
+import org.springframework.boot.context.config.ConfigDataResourceNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -46,6 +48,28 @@ public class GlobalExceptionHandler {
                 .body(BaseResponse.<Void>builder()
                         .success(false)
                         .message("Terjadi kesalahan sistem")
+                        .data(null)
+                        .build());
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<BaseResponse<Void>> handleNotFoundException(
+            ResourceNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(BaseResponse.<Void>builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<BaseResponse<Void>> handleInsufficientStockException(
+            InsufficientStockException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.<Void>builder()
+                        .success(false)
+                        .message(ex.getMessage())
                         .data(null)
                         .build());
     }

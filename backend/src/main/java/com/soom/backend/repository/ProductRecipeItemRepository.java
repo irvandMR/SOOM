@@ -9,5 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface ProductRecipeItemRepository extends JpaRepository<ProductRecipeItemEntity, UUID> {
-    List<ProductRecipeItemEntity> findByRecipeIdAndIsDeletedFalse(UUID recipeId);
+    List<ProductRecipeItemEntity> findByRecipesIdAndIsDeletedFalse(UUID recipeId);
 }
