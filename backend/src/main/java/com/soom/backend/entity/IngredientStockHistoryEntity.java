@@ -9,11 +9,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "ingredients")
+@Table(name = "ingredients_stock_histories")
 @Getter
 @Setter
 @NoArgsConstructor
-public class IngredientHistoryEntity extends BaseEntity{
+public class IngredientStockHistoryEntity extends BaseEntity{
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ingredient_id", nullable = false)
