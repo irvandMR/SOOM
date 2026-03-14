@@ -141,7 +141,7 @@ public class ProductService {
                 .stream()
                 .map(recipe -> {
 
-                    List<ProductRecipeItemEntity> items = recipeItemRepository.findByRecipeIdAndIsDeletedFalse(recipe.getId());
+                    List<ProductRecipeItemEntity> items = recipeItemRepository.findByRecipesIdAndIsDeletedFalse(recipe.getId());
 
                     BigDecimal cost = calculateCost(items);
                     return toRecipeResponse(recipe, items, cost);
@@ -165,7 +165,7 @@ public class ProductService {
         recipe.setActive(true);
         recipeRepository.save(recipe);
 
-        List<ProductRecipeItemEntity> items = recipeItemRepository.findByRecipeIdAndIsDeletedFalse(recipeId);
+        List<ProductRecipeItemEntity> items = recipeItemRepository.findByRecipesIdAndIsDeletedFalse(recipeId);
         BigDecimal cost = calculateCost(items);
 
 
