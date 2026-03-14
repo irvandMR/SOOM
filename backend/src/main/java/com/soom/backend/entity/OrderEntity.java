@@ -1,8 +1,8 @@
 package com.soom.backend.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import com.soom.backend.enums.OrderStatus;
+import com.soom.backend.enums.PaymentStatus;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -35,7 +35,8 @@ public class OrderEntity extends BaseEntity{
     private LocalDate requiredDate;
 
     @Column(nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
 
     @Column(name = "total_amount", nullable = false)
     private BigDecimal totalAmount;
@@ -44,7 +45,8 @@ public class OrderEntity extends BaseEntity{
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
     @Column(name = "payment_status", nullable = false)
-    private String paymentStatus;
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus;
 
     @Column(columnDefinition = "text")
     private String notes;

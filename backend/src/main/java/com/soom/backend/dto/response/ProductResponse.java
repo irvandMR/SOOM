@@ -1,5 +1,6 @@
 package com.soom.backend.dto.response;
 
+import com.soom.backend.enums.ProductType;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,7 +12,7 @@ import java.util.UUID;
 public class ProductResponse {
     private UUID id;
     private String name;
-    private String type;
+    private ProductType type;
     private String categoryName;
     private String unitName;
     private BigDecimal defaultPrice;

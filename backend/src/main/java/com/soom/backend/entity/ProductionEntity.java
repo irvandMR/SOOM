@@ -1,5 +1,6 @@
 package com.soom.backend.entity;
 
+import com.soom.backend.enums.ProductionStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,7 +31,8 @@ public class ProductionEntity extends BaseEntity {
     private LocalDate productionDate;
 
     @Column(nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private ProductionStatus status;
 
     @Column(columnDefinition = "text")
     private String notes;

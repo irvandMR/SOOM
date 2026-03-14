@@ -1,8 +1,7 @@
 package com.soom.backend.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import com.soom.backend.enums.CashFlowType;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,7 +18,8 @@ import java.util.UUID;
 public class CashFlowEntity extends BaseEntity {
 
     @Column(nullable = false)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private CashFlowType type;
 
     @Column(nullable = false)
     private String category;

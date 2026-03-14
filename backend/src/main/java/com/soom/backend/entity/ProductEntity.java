@@ -1,5 +1,6 @@
 package com.soom.backend.entity;
 
+import com.soom.backend.enums.ProductType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,7 +27,8 @@ public class ProductEntity extends BaseEntity{
     private String name;
 
     @Column(nullable = false)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private ProductType type;
 
     @Column(name = "default_price")
     private BigDecimal defaultPrice = BigDecimal.ZERO;
