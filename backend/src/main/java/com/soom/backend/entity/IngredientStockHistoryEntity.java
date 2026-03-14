@@ -1,5 +1,6 @@
 package com.soom.backend.entity;
 
+import com.soom.backend.enums.StockHistoryType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,7 +21,8 @@ public class IngredientStockHistoryEntity extends BaseEntity{
     private IngredientsEntity ingredients;
 
     @Column(nullable = false)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private StockHistoryType type;
 
     @Column(nullable = false)
     private BigDecimal quantity;

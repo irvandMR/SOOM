@@ -1,5 +1,6 @@
 package com.soom.backend.dto.request;
 
+import com.soom.backend.enums.ProductType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -19,8 +20,8 @@ public class ProductRequest {
     @NotBlank(message = "Nama tidak boleh kosong")
     private String name;
 
-    @NotBlank(message = "Tipe tidak boleh kosong")
-    private String type;
+    @NotNull(message = "Tipe tidak boleh kosong")
+    private ProductType type;
 
     @NotNull(message = "Harga tidak boleh kosong")
     private BigDecimal defaultPrice;

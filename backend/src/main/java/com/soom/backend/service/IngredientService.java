@@ -8,6 +8,7 @@ import com.soom.backend.entity.CategoryEntity;
 import com.soom.backend.entity.IngredientStockHistoryEntity;
 import com.soom.backend.entity.IngredientsEntity;
 import com.soom.backend.entity.UnitsEntity;
+import com.soom.backend.enums.StockHistoryType;
 import com.soom.backend.repository.CategoryRepository;
 import com.soom.backend.repository.IngredientStockHistoryRepository;
 import com.soom.backend.repository.IngredientRepository;
@@ -110,7 +111,7 @@ public class IngredientService {
         // Simpan history
         IngredientStockHistoryEntity history = new IngredientStockHistoryEntity();
         history.setIngredients(ingredient);
-        history.setType("IN");
+        history.setType(StockHistoryType.IN);
         history.setQuantity(request.getQuantity());
         history.setPurchasePrice(request.getPurchasePrice());
         history.setNotes(request.getNotes());
@@ -141,7 +142,7 @@ public class IngredientService {
                 .stream()
                 .map(h -> IngredientHistoryResponse.builder()
                         .id(h.getId())
-                        .type(h.getType())
+                        .type(h.getType().name())
                         .quantity(h.getQuantity())
                         .purchasePrice(h.getPurchasePrice())
                         .notes(h.getNotes())
