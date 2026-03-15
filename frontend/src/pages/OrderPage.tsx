@@ -14,6 +14,8 @@ import StatusBadge from '../components/common/ui/StatusBadge'
 import Button from '../components/common/ui/Button'
 import FilterBar from '../components/common/ui/FilterBar'
 import ItemRow from '../components/common/ui/ItemRow'
+import { confirmDialog } from '../components/common/ui/ConfirmDialog'
+import { toast } from '../store/useToastStore'
 
 interface Product { id: string; name: string; defaultPrice: number }
 
@@ -114,33 +116,35 @@ export default function OrderPage() {
   }, [])
 
   const handleCreate = async () => {
-    setError('')
-    setSubmitting(true)
-    try {
-      await api.post('/orders', form)
-      await fetchOrders()
-      setShowCreateModal(false)
-      setForm(defaultForm)
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal membuat order')
-    } finally {
-      setSubmitting(false)
+        setError('')
+        setSubmitting(true)
+        try {
+            await api.post('/orders', form)
+            await fetchOrders()
+            setShowCreateModal(false)
+            setForm(defaultForm)
+            toast.success('Berhasil', 'Order berhasil dibuat')
+        } catch (err: any) {
+            setError('Gagal membuat order')
+        } finally {
+            setSubmitting(false)
+        }
     }
-  }
 
   const handleUpdateStatus = async () => {
     if (!selectedOrder) return
     setError('')
     setSubmitting(true)
     try {
-      await api.put(`/orders/${selectedOrder.id}/status`, { status: newStatus })
-      await fetchDetail(selectedOrder.id)
-      await fetchOrders()
-      setShowStatusModal(false)
+        await api.put(`/orders/${selectedOrder.id}/status`, { status: newStatus })
+        await fetchDetail(selectedOrder.id)
+        await fetchOrders()
+        setShowStatusModal(false)
+        toast.success('Berhasil', 'Status order berhasil diupdate')
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal update status')
+        setError('Gagal update status')
     } finally {
-      setSubmitting(false)
+        setSubmitting(false)
     }
   }
 
@@ -149,27 +153,38 @@ export default function OrderPage() {
     setError('')
     setSubmitting(true)
     try {
-      await api.post(`/orders/${selectedOrder.id}/payments`, paymentForm)
-      await fetchDetail(selectedOrder.id)
-      await fetchOrders()
-      setShowPaymentModal(false)
-      setPaymentForm({ amount: 0, paymentType: 'SETTLEMENT', paymentDate: new Date().toISOString().split('T')[0], notes: '' })
+        await api.post(`/orders/${selectedOrder.id}/payments`, paymentForm)
+        await fetchDetail(selectedOrder.id)
+        await fetchOrders()
+        setShowPaymentModal(false)
+        setPaymentForm({ amount: 0, paymentType: 'SETTLEMENT', paymentDate: new Date().toISOString().split('T')[0], notes: '' })
+        toast.success('Berhasil', 'Pembayaran berhasil ditambahkan')
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal tambah pembayaran')
+        setError('Gagal tambah pembayaran')
     } finally {
-      setSubmitting(false)
+        setSubmitting(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Hapus order ini?')) return
-    try {
-      await api.delete(`/orders/${id}`)
-      await fetchOrders()
-    } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Gagal menghapus')
+  const handleDelete = (id: string) => {
+        confirmDialog({
+            message: 'Order ini akan dihapus permanen.',
+            header: 'Hapus Order?',
+            icon: 'pi pi-trash',
+            acceptClassName: 'p-button-danger',
+            acceptLabel: 'Hapus',
+            rejectLabel: 'Batal',
+            accept: async () => {
+            try {
+                await api.delete(`/orders/${id}`)
+                await fetchOrders()
+                toast.success('Berhasil', 'Order berhasil dihapus')
+            } catch (err: any) {
+                toast.error('Gagal', 'Gagal menghapus')
+            }
+            },
+        })
     }
-  }
 
   const addItem = () => setForm({ ...form, items: [...form.items, { productId: '', quantity: 1 }] })
   const removeItem = (i: number) => setForm({ ...form, items: form.items.filter((_, idx) => idx !== i) })

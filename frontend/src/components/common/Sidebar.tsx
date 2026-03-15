@@ -2,9 +2,10 @@ import { NavLink } from 'react-router-dom'
 import { Sidebar as PrimeSidebar } from 'primereact/sidebar'
 import { useSidebarStore } from '../../store/useSidebarStore'
 import { useBreakpoint } from '../../hooks/useBreakpoint'
+import { useAuthStore } from '../../store/useAuthStore'
 import { ROUTES } from '../../constants/routes'
 
-const menuItems = [
+const mainMenuItems = [
   {
     label: 'Dashboard', path: ROUTES.DASHBOARD,
     icon: (
@@ -61,25 +62,91 @@ const menuItems = [
   },
 ]
 
-const SidebarContent = ({ collapsed, onClose }: { collapsed: boolean; onClose?: () => void }) => (
+const adminMenuItems = [
+  {
+    label: 'Units', path: ROUTES.UNITS,
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+        <path d="M4 8h8M4 5h8M4 11h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    label: 'Kategori', path: ROUTES.CATEGORIES,
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+        <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+        <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+        <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+        <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+      </svg>
+    ),
+  },
+]
+
+const MenuList = ({
+  items, collapsed, onClose, sectionLabel
+}: {
+  items: typeof mainMenuItems
+  collapsed: boolean
+  onClose?: () => void
+  sectionLabel?: string
+}) => (
   <>
-    {/* Header */}
-    <div style={{
-      height: 'var(--topbar-height)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 12px 0 16px',
-      borderBottom: '1px solid var(--sidebar-border)',
-      flexShrink: 0,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    {sectionLabel && !collapsed && (
+      <div style={{
+        fontSize: 10, fontWeight: 600,
+        color: 'var(--sidebar-muted)',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        padding: '8px 16px 4px',
+      }}>
+        {sectionLabel}
+      </div>
+    )}
+    {items.map((item) => (
+      <NavLink
+        key={item.path}
+        to={item.path}
+        end={item.path === '/'}
+        onClick={onClose}
+        style={({ isActive }) => ({
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: collapsed ? '10px 0' : '8px 16px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          color: isActive ? 'var(--sidebar-text)' : 'var(--sidebar-muted)',
+          background: isActive ? 'var(--sidebar-active)' : 'transparent',
+          borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+          fontWeight: isActive ? 600 : 400,
+          fontSize: 13, textDecoration: 'none',
+          whiteSpace: 'nowrap', transition: 'all 0.13s',
+        })}
+      >
+        {item.icon}
+        {!collapsed && <span>{item.label}</span>}
+      </NavLink>
+    ))}
+  </>
+)
+
+const SidebarContent = ({ collapsed, onClose }: { collapsed: boolean; onClose?: () => void }) => {
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
+
+  return (
+    <>
+      {/* Header */}
+      <div style={{
+        height: 'var(--topbar-height)',
+        display: 'flex', alignItems: 'center',
+        padding: '0 16px', gap: 10,
+        borderBottom: '1px solid var(--sidebar-border)',
+        flexShrink: 0,
+      }}>
         <div style={{
-          width: 28, height: 28,
-          background: 'var(--accent)',
-          borderRadius: 7,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
+          width: 28, height: 28, background: 'var(--accent)',
+          borderRadius: 7, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', flexShrink: 0,
         }}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <rect x="1" y="1" width="5" height="5" rx="1" fill="white"/>
@@ -94,82 +161,62 @@ const SidebarContent = ({ collapsed, onClose }: { collapsed: boolean; onClose?: 
           </span>
         )}
       </div>
-    </div>
 
-    {/* Menu */}
-    <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto', overflowX: 'hidden' }}>
-      {!collapsed && (
+      {/* Menu */}
+      <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto', overflowX: 'hidden' }}>
+        <MenuList
+          items={mainMenuItems}
+          collapsed={collapsed}
+          onClose={onClose}
+          sectionLabel="Main Menu"
+        />
+
+        {/* Admin Only */}
+        {isAdmin && (
+          <>
+            <div style={{ borderTop: '1px solid var(--sidebar-border)', margin: '8px 0' }} />
+            <MenuList
+              items={adminMenuItems}
+              collapsed={collapsed}
+              onClose={onClose}
+              sectionLabel="Settings"
+            />
+          </>
+        )}
+      </nav>
+
+      {/* Footer */}
+    <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '12px 16px' }}>
         <div style={{
-          fontSize: 10, fontWeight: 600,
-          color: 'var(--sidebar-muted)',
-          textTransform: 'uppercase',
-          letterSpacing: 1,
-          padding: '4px 16px 6px',
-        }}>
-          Main Menu
-        </div>
-      )}
-      {menuItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          end={item.path === '/'}
-          onClick={onClose}
-          style={({ isActive }) => ({
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: collapsed ? '10px 0' : '8px 16px',
+            display: 'flex', alignItems: 'center',
             justifyContent: collapsed ? 'center' : 'flex-start',
-            color: isActive ? 'var(--sidebar-text)' : 'var(--sidebar-muted)',
-            background: isActive ? 'var(--sidebar-active)' : 'transparent',
-            borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-            fontWeight: isActive ? 600 : 400,
-            fontSize: 13,
-            textDecoration: 'none',
-            whiteSpace: 'nowrap',
-            transition: 'all 0.13s',
-          })}
-        >
-          {item.icon}
-          {!collapsed && <span>{item.label}</span>}
-        </NavLink>
-      ))}
-    </nav>
-
-    {/* Footer */}
-    <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '10px 0' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: collapsed ? '8px 0' : '8px 16px',
-        justifyContent: collapsed ? 'center' : 'flex-start',
-        color: 'var(--sidebar-muted)', fontSize: 13,
-      }}>
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
-          <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-        </svg>
-        {!collapsed && <span>Admin SOOM</span>}
-      </div>
+            gap: 6,
+        }}>
+            <div style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: '#4CAF50', flexShrink: 0,
+            }} />
+            {!collapsed && (
+            <span style={{ fontSize: 10, color: 'var(--sidebar-muted)', fontWeight: 500, letterSpacing: 0.5 }}>
+                SOOM v1.0.0
+            </span>
+            )}
+        </div>
     </div>
-  </>
-)
+    </>
+  )
+}
 
 export default function Sidebar() {
   const { collapsed, toggle } = useSidebarStore()
   const { isMobile } = useBreakpoint()
 
-  // Mobile — PrimeSidebar drawer
   if (isMobile) {
     return (
       <PrimeSidebar
         visible={!collapsed}
         onHide={toggle}
-        style={{
-          width: 'var(--sidebar-width)',
-          background: 'var(--sidebar-bg)',
-          padding: 0,
-        }}
+        style={{ width: 'var(--sidebar-width)', background: 'var(--sidebar-bg)', padding: 0 }}
         pt={{
           header: { style: { display: 'none' } },
           content: { style: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } },
@@ -180,21 +227,16 @@ export default function Sidebar() {
     )
   }
 
-  // Desktop — fixed sidebar
   return (
     <aside style={{
       width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
       background: 'var(--sidebar-bg)',
       borderRight: '1px solid var(--sidebar-border)',
-      display: 'flex',
-      flexDirection: 'column',
+      display: 'flex', flexDirection: 'column',
       transition: 'width 0.22s ease',
-      overflow: 'visible',
-      flexShrink: 0,
-      height: '100vh',
-      position: 'fixed',
-      top: 0, left: 0,
-      zIndex: 101,
+      overflow: 'visible', flexShrink: 0,
+      height: '100vh', position: 'fixed',
+      top: 0, left: 0, zIndex: 101,
     }}>
       <SidebarContent collapsed={collapsed} />
 
@@ -202,18 +244,13 @@ export default function Sidebar() {
       <button
         onClick={toggle}
         style={{
-          position: 'absolute',
-          top: 16, right: -12,
+          position: 'absolute', top: 16, right: -12,
           width: 24, height: 24,
           border: '1px solid var(--sidebar-border)',
-          borderRadius: '50%',
-          background: 'var(--white)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--muted)',
-          zIndex: 102,
+          borderRadius: '50%', background: 'var(--white)',
+          cursor: 'pointer', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          color: 'var(--muted)', zIndex: 102,
           boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
         }}
       >

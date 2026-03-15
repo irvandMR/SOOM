@@ -3,15 +3,19 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { useSidebarStore } from '../../store/useSidebarStore'
 import { useBreakpoint } from '../../hooks/useBreakpoint'
+import GlobalToast from './ui/GlobalToast'
+import ConfirmDialog from './ui/ConfirmDialog'
+import LoadingOverlay from './ui/LoadingOverlay'
 
 const breadcrumbMap: Record<string, string[]> = {
   '/': ['Main Menu', 'Dashboard'],
   '/orders': ['Main Menu', 'Order'],
-  '/orders/new': ['Main Menu', 'Order', 'Buat Order Baru'],
   '/products': ['Main Menu', 'Produk & Resep'],
   '/ingredients': ['Main Menu', 'Stok Bahan Baku'],
   '/productions': ['Main Menu', 'Produksi'],
   '/cash-flow': ['Main Menu', 'Keuangan'],
+  '/settings/units': ['Settings', 'Units'],
+  '/settings/categories': ['Settings', 'Kategori'],
 }
 
 export default function AppLayout() {
@@ -19,7 +23,18 @@ export default function AppLayout() {
   const { isMobile } = useBreakpoint()
   const location = useLocation()
 
-  const breadcrumb = breadcrumbMap[location.pathname] ?? ['Main Menu']
+  // Handle dynamic breadcrumb
+  const getBreadcrumb = (): string[] => {
+    const path = location.pathname
+
+    if (path.startsWith('/products/') && path.endsWith('/recipes')) {
+      return ['Main Menu', 'Produk & Resep', 'History Resep']
+    }
+
+    return breadcrumbMap[path] ?? ['Main Menu']
+  }
+
+  const breadcrumb = getBreadcrumb()
 
   const marginLeft = isMobile
     ? 0
@@ -29,7 +44,9 @@ export default function AppLayout() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--content-bg)' }}>
-
+      <GlobalToast />
+      <ConfirmDialog />
+      <LoadingOverlay /> 
       <Sidebar />
 
       <div style={{
