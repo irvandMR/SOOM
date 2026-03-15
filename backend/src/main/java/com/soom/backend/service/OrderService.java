@@ -169,7 +169,7 @@ public class OrderService {
 
 
     public OrderResponse updateStatus(UUID id, UpdateOrderStatusRequest request){
-        OrderEntity order = new OrderEntity();
+        OrderEntity order = findById(id);
         order.setStatus(request.getStatus());
         orderRepository.save(order);
         return toResponse(order);
