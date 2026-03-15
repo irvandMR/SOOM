@@ -11,6 +11,8 @@ import FormField from '../components/common/ui/FormField'
 import StatusBadge from '../components/common/ui/StatusBadge'
 import Button from '../components/common/ui/Button'
 import { Plus, Trash2 } from 'lucide-react'
+import {confirmDialog} from '../components/common/ui/ConfirmDialog'
+import { toast } from '../store/useToastStore'
 
 interface Category { id: string; name: string }
 interface Unit { id: string; name: string; symbol: string }
@@ -57,14 +59,15 @@ export default function IngredientPage() {
     setError('')
     setSubmitting(true)
     try {
-      await api.post('/ingredients', form)
-      await fetchIngredients()
-      setShowAddModal(false)
-      setForm({ name: '', categoryId: '', unitId: '', minimumStock: 0 })
+        await api.post('/ingredients', form)
+        await fetchIngredients()
+        setShowAddModal(false)
+        setForm({ name: '', categoryId: '', unitId: '', minimumStock: 0 })
+        toast.success('Berhasil', 'Bahan baku berhasil ditambahkan')
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal menambahkan')
+        setError(err.response?.data?.message ?? 'Gagal menambahkan')
     } finally {
-      setSubmitting(false)
+        setSubmitting(false)
     }
   }
 
@@ -73,26 +76,37 @@ export default function IngredientPage() {
     setError('')
     setSubmitting(true)
     try {
-      await api.post(`/ingredients/${selectedIngredient.id}/stock-in`, stockInForm)
-      await fetchIngredients()
-      setShowStockInModal(false)
-      setStockInForm({ quantity: 0, purchasePrice: 0, notes: '' })
+        await api.post(`/ingredients/${selectedIngredient.id}/stock-in`, stockInForm)
+        await fetchIngredients()
+        setShowStockInModal(false)
+        setStockInForm({ quantity: 0, purchasePrice: 0, notes: '' })
+        toast.success('Berhasil', `Stok ${selectedIngredient.name} berhasil ditambahkan`)
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal menambah stok')
+        setError(err.response?.data?.message ?? 'Gagal menambah stok')
     } finally {
-      setSubmitting(false)
+        setSubmitting(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Hapus bahan baku ini?')) return
-    try {
-      await api.delete(`/ingredients/${id}`)
-      await fetchIngredients()
-    } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Gagal menghapus')
-    }
-  }
+  const handleDelete = (id: string) => {
+    confirmDialog({
+        message: 'Bahan baku ini akan dihapus permanen.',
+        header: 'Hapus Bahan Baku?',
+        icon: 'pi pi-trash',
+        acceptClassName: 'p-button-danger',
+        acceptLabel: 'Hapus',
+        rejectLabel: 'Batal',
+        accept: async () => {
+        try {
+            await api.delete(`/ingredients/${id}`)
+            await fetchIngredients()
+            toast.success('Berhasil', 'Bahan baku berhasil dihapus')
+        } catch (err: any) {
+            toast.error('Gagal', err.response?.data?.message ?? 'Gagal menghapus')
+        }
+        },
+    })
+   }
 
   const columns = [
     { header: 'Nama', field: 'name' },

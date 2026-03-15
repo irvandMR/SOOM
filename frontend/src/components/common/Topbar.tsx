@@ -158,20 +158,32 @@ export default function Topbar({ breadcrumb }: TopbarProps) {
         {/* Avatar + Dropdown */}
         <Menu model={avatarMenuItems} popup ref={menuRef} />
         <div
-          onClick={(e) => menuRef.current?.toggle(e)}
-          style={{
-            width: 30, height: 30,
-            borderRadius: '50%',
-            background: 'var(--sidebar-active)',
-            border: '1.5px solid var(--sidebar-border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 700,
-            color: 'var(--sidebar-text)',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          {user?.name?.charAt(0).toUpperCase() ?? 'A'}
+            onClick={(e) => menuRef.current?.toggle(e)}
+            style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                cursor: 'pointer', padding: '4px 8px',
+                borderRadius: 8, border: '1px solid var(--border)',
+                background: 'var(--sidebar-bg)',
+            }}
+            >
+            <div style={{
+                width: 26, height: 26,
+                borderRadius: '50%',
+                background: 'var(--accent)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700, color: 'white',
+                flexShrink: 0,
+            }}>
+                {user?.name?.charAt(0).toUpperCase() ?? 'A'}
+            </div>
+            {!isMobile && (
+                <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                {user?.name ?? 'Admin'}
+                </span>
+            )}
+            <svg width="10" height="10" viewBox="0 0 8 5" fill="none">
+                <path d="M1 1l3 3 3-3" stroke="var(--muted)" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
         </div>
       </div>
     </header>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { InputText } from 'primereact/inputtext'
 import { Dropdown } from 'primereact/dropdown'
 import { InputNumber } from 'primereact/inputnumber'
-import { TrendingUp, TrendingDown, Wallet } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, FileSpreadsheet, FileText, Plus } from 'lucide-react'
 import api from '../services/api'
 import type { CashFlow, CashFlowSummary, MonthlyReport, ManualCashFlowRequest } from '../types/cashflow.types'
 import { formatRupiah, formatDate } from '../utils/format'
@@ -12,6 +12,8 @@ import Modal from '../components/common/ui/Modal'
 import FormField from '../components/common/ui/FormField'
 import StatusBadge from '../components/common/ui/StatusBadge'
 import FilterBar from '../components/common/ui/FilterBar'
+import Button from '../components/common/ui/Button'
+import { toast } from '../store/useToastStore'
 
 const categoryOptions = [
   { label: 'Penjualan', value: 'Penjualan' },
@@ -123,12 +125,32 @@ export default function CashFlowPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Keuangan"
-        subtitle="Rekap pemasukan dan pengeluaran"
-        actionLabel="Input Manual"
-        onAction={() => setShowModal(true)}
-      />
+      {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+            <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>Keuangan</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Rekap pemasukan dan pengeluaran</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+            label="Export Excel"
+            icon={<FileSpreadsheet size={13} />}
+            variant="secondary"
+            onClick={() => toast.info('Segera Hadir', 'Fitur export Excel sedang dikembangkan')}
+            />
+            <Button
+            label="Export PDF"
+            icon={<FileText size={13} />}
+            variant="secondary"
+            onClick={() => toast.info('Segera Hadir', 'Fitur export PDF sedang dikembangkan')}
+            />
+            <Button
+            label="Input Manual"
+            icon={<Plus size={13} />}
+            onClick={() => setShowModal(true)}
+            />
+        </div>
+        </div>
 
       {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>

@@ -14,6 +14,8 @@ import ProductRecipeHistoryPage from './pages/ProductRecipeHistoryPage'
 import { useAuthStore } from './store/useAuthStore'
 import { useEffect, useState } from 'react'
 import api from './services/api'
+import UnitsPage from './pages/UnitsPage'
+import CategoriesPage from './pages/CategoriesPage'
 
 
 export default function App() {
@@ -69,6 +71,8 @@ export default function App() {
         <Route path={ROUTES.PRODUCTIONS} element={<ProductionPage />} />
         <Route path={ROUTES.CASH_FLOW} element={<CashFlowPage />} />
         <Route path={ROUTES.PRODUCT_RECIPE_HISTORY} element={<ProductRecipeHistoryPage />} />
+        <Route path={ROUTES.UNITS} element={<UnitsPage />} />
+        <Route path={ROUTES.CATEGORIES} element={<CategoriesPage />} />
       </Route>
 
       {/* Fallback */}

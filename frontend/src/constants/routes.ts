@@ -10,4 +10,6 @@ export const ROUTES = {
     PRODUCTIONS: '/productions',
     CASH_FLOW: '/cash-flow',
     PRODUCT_RECIPE_HISTORY: '/products/:id/recipes',
+    UNITS: '/settings/units',
+    CATEGORIES: '/settings/categories',
 }

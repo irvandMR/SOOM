@@ -471,15 +471,16 @@ export default function ProductPage() {
                 <Button label="Tambah Bahan" icon={<Plus size={11} />} size="small" variant="secondary" onClick={addRecipeItem} />
               </div>
 
-              {recipeForm.items.map((item, i) => (
-                <ItemRow
+              {recipeForm.items.map((item, i) => {
+                return (
+                    <ItemRow
                     key={i}
                     index={i}
                     onRemove={() => removeRecipeItem(i)}
                     showRemove={recipeForm.items.length > 1}
-                >
+                    >
                     <FormField label="Bahan Baku" required>
-                    <Dropdown
+                        <Dropdown
                         value={item.ingredientId}
                         onChange={(e) => updateRecipeItem(i, 'ingredientId', e.value)}
                         options={ingredients}
@@ -487,19 +488,37 @@ export default function ProductPage() {
                         optionValue="id"
                         placeholder="Pilih bahan"
                         className="w-full"
-                    />
+                        itemTemplate={(option) => (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>{option.name}</span>
+                            <span style={{
+                                fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                                background: 'var(--sidebar-bg)', color: 'var(--muted)',
+                                marginLeft: 8,
+                            }}>
+                                {option.unitSymbol}
+                            </span>
+                            </div>
+                        )
+                    }
+                        />
                     </FormField>
-                    <FormField label="Jumlah">
-                    <InputNumber
-                        value={item.quantity}
-                        onValueChange={(e) => updateRecipeItem(i, 'quantity', e.value ?? 0)}
-                        minFractionDigits={0}
-                        maxFractionDigits={3}
-                        className="w-full"
-                    />
-                    </FormField>
-                </ItemRow>
-                ))}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'end' }}>
+                        <FormField label="Jumlah">
+                        <InputNumber
+                            value={item.quantity}
+                            onValueChange={(e) => updateRecipeItem(i, 'quantity', e.value ?? 0)}
+                            minFractionDigits={0}
+                            maxFractionDigits={3}
+                            className="w-full"
+                        />
+                        </FormField>
+
+                    </div>
+                    </ItemRow>
+                )
+                })}
 
               {error && <div style={{ background: '#FFEBEE', color: '#C62828', fontSize: 12, padding: '8px 10px', borderRadius: 6, marginBottom: 8 }}>{error}</div>}
 
