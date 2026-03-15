@@ -69,7 +69,7 @@ export default function ProductRecipeHistoryPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <Button
           icon={<ArrowLeft size={14} />}
           variant="ghost"
@@ -86,7 +86,7 @@ export default function ProductRecipeHistoryPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, alignItems: 'start' }}>
 
         {/* Kiri — Semua Versi Resep */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
