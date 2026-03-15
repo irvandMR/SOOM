@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 interface User {
   id: string
@@ -14,9 +15,16 @@ interface AuthStore {
   clearAuth: () => void
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  accessToken: null,
-  user: null,
-  setAuth: (token, user) => set({ accessToken: token, user }),
-  clearAuth: () => set({ accessToken: null, user: null }),
-}))
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      accessToken: null,
+      user: null,
+      setAuth: (token, user) => set({ accessToken: token, user }),
+      clearAuth: () => set({ accessToken: null, user: null }),
+    }),
+    {
+      name: 'soom-auth', // key di localStorage
+    }
+  )
+)

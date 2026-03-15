@@ -9,4 +9,5 @@ export const ROUTES = {
     INGREDIENTS: '/ingredients',
     PRODUCTIONS: '/productions',
     CASH_FLOW: '/cash-flow',
+    PRODUCT_RECIPE_HISTORY: '/products/:id/recipes',
 }

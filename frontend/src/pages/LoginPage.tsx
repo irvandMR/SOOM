@@ -1,10 +1,15 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/useAuthStore'
 import { ROUTES } from '../constants/routes'
 import axios from 'axios'
 
 export default function LoginPage() {
+    const { accessToken } = useAuthStore()
+
+    if (accessToken) {
+    return <Navigate to="/" replace />
+    }
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
 
