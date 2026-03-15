@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { InputText } from 'primereact/inputtext'
 import { Dropdown } from 'primereact/dropdown'
 import { InputNumber } from 'primereact/inputnumber'
-import { Plus, Trash2, Eye, X, ChefHat } from 'lucide-react'
+import { Plus, Trash2, Eye, ChefHat } from 'lucide-react'
 import api from '../services/api'
 import type { Product, ProductRequest, Recipe, RecipeRequest, RecipeItemRequest } from '../types/product.types'
 import { formatRupiah } from '../utils/format'
@@ -189,7 +189,7 @@ export default function ProductPage() {
   const columns = [
     { header: 'Nama', field: 'name' },
     { header: 'Tipe', body: (row: Product) => (
-      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, background: '#EEF0FB', color: '#5B6BD4' }}>
+      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4,whiteSpace: 'nowrap', background: '#EEF0FB', color: '#5B6BD4' }}>
         {typeLabel[row.type] ?? row.type}
       </span>
     )},
@@ -353,7 +353,7 @@ export default function ProductPage() {
                   Resep Aktif
                 </div>
                 <Button
-                  label="Lihat Semua Versi"
+                  label="Lihat Semua Versi >>"
                   variant="ghost"
                   size="small"
                   onClick={() => {
@@ -416,7 +416,7 @@ export default function ProductPage() {
                   Resep Aktif
                 </div>
                 <Button
-                  label="Lihat History Lengkap"
+                  label="Lihat History Lengkap >>"
                   variant="ghost"
                   size="small"
                   onClick={() => {
