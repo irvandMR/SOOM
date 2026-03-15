@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { useSidebarStore } from '../../store/useSidebarStore'
+import { useBreakpoint } from '../../hooks/useBreakpoint'
 
 const breadcrumbMap: Record<string, string[]> = {
   '/': ['Main Menu', 'Dashboard'],
@@ -15,43 +16,42 @@ const breadcrumbMap: Record<string, string[]> = {
 
 export default function AppLayout() {
   const { collapsed } = useSidebarStore()
+  const { isMobile } = useBreakpoint()
   const location = useLocation()
 
   const breadcrumb = breadcrumbMap[location.pathname] ?? ['Main Menu']
 
-  const sidebarWidth = collapsed
-    ? 'var(--sidebar-collapsed)'
-    : 'var(--sidebar-width)'
+  const marginLeft = isMobile
+    ? 0
+    : collapsed
+      ? 'var(--sidebar-collapsed)'
+      : 'var(--sidebar-width)'
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--content-bg)' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--content-bg)' }}>
 
-      {/* Sidebar */}
       <Sidebar />
 
-      {/* Main — geser kanan sesuai lebar sidebar */}
       <div style={{
         flex: 1,
-        marginLeft: sidebarWidth,
+        marginLeft,
         transition: 'margin-left 0.22s ease',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
       }}>
-
-        {/* Topbar */}
         <Topbar breadcrumb={breadcrumb} />
 
-        {/* Content */}
         <main style={{
           flex: 1,
           marginTop: 'var(--topbar-height)',
-          padding: '24px',
+          padding: isMobile ? '16px' : '24px',
           background: 'var(--content-bg)',
+          overflowY: 'auto',
         }}>
           <Outlet />
         </main>
-
       </div>
     </div>
   )
