@@ -4,21 +4,17 @@ import com.soom.backend.dto.request.IngredientRequest;
 import com.soom.backend.dto.request.StockInRequest;
 import com.soom.backend.dto.response.IngredientResponse;
 import com.soom.backend.dto.response.IngredientHistoryResponse;
-import com.soom.backend.entity.CategoryEntity;
-import com.soom.backend.entity.IngredientStockHistoryEntity;
-import com.soom.backend.entity.IngredientsEntity;
-import com.soom.backend.entity.UnitsEntity;
+import com.soom.backend.entity.*;
+import com.soom.backend.enums.CashFlowType;
 import com.soom.backend.enums.StockHistoryType;
-import com.soom.backend.repository.CategoryRepository;
-import com.soom.backend.repository.IngredientStockHistoryRepository;
-import com.soom.backend.repository.IngredientRepository;
-import com.soom.backend.repository.UnitRepository;
+import com.soom.backend.repository.*;
 import com.soom.backend.utils.AuthUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,6 +27,7 @@ public class IngredientService {
     private final UnitRepository unitRepository;
     private final AuthUtil authUtil;
     private final IngredientStockHistoryRepository ingredientHistoryRepository;
+    private final CashFlowRepository cashFlowRepository;
 
     public List<IngredientResponse> getAll() {
         return ingredientRepository.findByIsDeletedFalse()
@@ -121,6 +118,17 @@ public class IngredientService {
         // Update stok & avg price di ingredient
         BigDecimal oldStock = ingredient.getStockQuantity();
         BigDecimal newStock = oldStock.add(request.getQuantity());
+
+        CashFlowEntity cashFlow = new CashFlowEntity();
+        cashFlow.setType(CashFlowType.OUT);
+        cashFlow.setCategory("Pembelian Bahan");
+        cashFlow.setAmount(request.getPurchasePrice()
+                .multiply(request.getQuantity()));
+        cashFlow.setDescription("Pembelian " + ingredient.getName());
+        cashFlow.setTransactionDate(LocalDate.now());
+        cashFlow.setReferenceType("INGREDIENT");
+        cashFlow.setReferenceId(ingredient.getId());
+        cashFlowRepository.save(cashFlow);
 
         // Hitung moving average price
         BigDecimal oldTotal = oldStock.multiply(ingredient.getAvgPurchasePrice());
