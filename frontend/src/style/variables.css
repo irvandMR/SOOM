@@ -1,0 +1,18 @@
+:root {
+  --sidebar-bg: #F0F7FA;
+  --sidebar-hover: #E2EFF5;
+  --sidebar-active: #D4E8F0;
+  --sidebar-text: #243D4D;
+  --sidebar-muted: rgba(36,61,77,0.5);
+  --sidebar-border: #C8DFE9;
+  --accent: #4A90B8;
+  --topbar-bg: #ffffff;
+  --content-bg: #F7FBFD;
+  --border: #E4EFF4;
+  --text: #1A2E3B;
+  --muted: #6B8FA0;
+  --white: #ffffff;
+  --sidebar-width: 220px;
+  --sidebar-collapsed: 58px;
+  --topbar-height: 56px;
+}
