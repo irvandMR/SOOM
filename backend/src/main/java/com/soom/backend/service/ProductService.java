@@ -119,7 +119,7 @@ public class ProductService {
             ProductRecipeItemEntity item = new ProductRecipeItemEntity();
             item.setRecipes(recipe);
             item.setIngredients(ingredients);
-            item.setQuantity(item.getQuantity());
+            item.setQuantity(itemRequest.getQuantity());
             items.add(item);
 
             // Hitung cost: quantity x avg_purchase_price

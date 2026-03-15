@@ -8,17 +8,12 @@ import com.soom.backend.dto.response.OrderDetailResponse;
 import com.soom.backend.dto.response.OrderItemResponse;
 import com.soom.backend.dto.response.OrderPaymentResponse;
 import com.soom.backend.dto.response.OrderResponse;
-import com.soom.backend.entity.OrderEntity;
-import com.soom.backend.entity.OrderItemEntity;
-import com.soom.backend.entity.OrderPaymentEntity;
-import com.soom.backend.entity.ProductEntity;
+import com.soom.backend.entity.*;
+import com.soom.backend.enums.CashFlowType;
 import com.soom.backend.enums.OrderStatus;
 import com.soom.backend.enums.PaymentStatus;
 import com.soom.backend.exception.ResourceNotFoundException;
-import com.soom.backend.repository.OrderItemRepository;
-import com.soom.backend.repository.OrderPaymentRepository;
-import com.soom.backend.repository.OrderRepository;
-import com.soom.backend.repository.ProductRepository;
+import com.soom.backend.repository.*;
 import com.soom.backend.utils.OrderNumberGenerator;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +33,7 @@ public class OrderService {
     private final OrderPaymentRepository orderPaymentRepository;
     private final ProductRepository productRepository;
     private final OrderNumberGenerator orderNumberGenerator;
+    private final CashFlowRepository cashFlowRepository;
 
     public List<OrderResponse> getAll(){
         return orderRepository.findByIsDeletedFalseOrderByOrderDateDesc()
@@ -115,6 +111,16 @@ public class OrderService {
                     request.getInitialPayment().compareTo(totalAmount) >= 0 ? PaymentStatus.PAID : PaymentStatus.DP
             );
             orderRepository.save(order);
+
+            CashFlowEntity cashFlow = new CashFlowEntity();
+            cashFlow.setType(CashFlowType.IN);
+            cashFlow.setCategory("Penjualan");
+            cashFlow.setAmount(request.getInitialPayment());
+            cashFlow.setDescription("Pembayaran order " + order.getOrderNumber());
+            cashFlow.setTransactionDate(request.getOrderDate());
+            cashFlow.setReferenceType("ORDER");
+            cashFlow.setReferenceId(order.getId());
+            cashFlowRepository.save(cashFlow);
         }
 
         return toDetailResponse(order, items, payments);
@@ -132,6 +138,16 @@ public class OrderService {
         payment.setPaymentDate(request.getPaymentDate());
         payment.setNotes(request.getNotes());
         orderPaymentRepository.save(payment);
+
+        CashFlowEntity cashFlow = new CashFlowEntity();
+        cashFlow.setType(CashFlowType.IN);
+        cashFlow.setCategory("Penjualan");
+        cashFlow.setAmount(request.getAmount());
+        cashFlow.setDescription("Pembayaran order " + order.getOrderNumber());
+        cashFlow.setTransactionDate(request.getPaymentDate());
+        cashFlow.setReferenceType("ORDER");
+        cashFlow.setReferenceId(order.getId());
+        cashFlowRepository.save(cashFlow);
 
         // Update paid amount
         BigDecimal newPaidAmount = order.getPaidAmount().add(request.getAmount());
@@ -177,10 +193,10 @@ public class OrderService {
                 .customerPhone(order.getCustomerPhone())
                 .orderDate(order.getOrderDate())
                 .requiredDate(order.getRequiredDate())
-                .status(order.getStatus().name())
+                .status(order.getStatus())
                 .totalAmount(order.getTotalAmount())
                 .paidAmount(order.getPaidAmount())
-                .paymentStatus(order.getPaymentStatus().name())
+                .paymentStatus(order.getPaymentStatus())
                 .notes(order.getNotes())
                 .build();
     }
