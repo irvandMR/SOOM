@@ -1,6 +1,7 @@
 package com.soom.backend.service;
 
 import com.soom.backend.dto.request.CreateUserRequest;
+import com.soom.backend.dto.request.UpdateUserRequest;
 import com.soom.backend.dto.response.AuthResponse;
 import com.soom.backend.dto.response.UserResponse;
 import com.soom.backend.entity.UserEntity;
@@ -68,7 +69,7 @@ public class UserService {
                 .orElseThrow(()-> new RuntimeException("User tidak ditemukan"));
     }
 
-    public UserResponse updateUser(CreateUserRequest request, UUID id){
+    public UserResponse updateUser(UpdateUserRequest request, UUID id){
         UserEntity user = findById(id);
         user.setName(request.getName());
         user.setEmail(request.getEmail());

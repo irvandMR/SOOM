@@ -1,6 +1,7 @@
 package com.soom.backend.controller;
 
 import com.soom.backend.dto.request.CreateUserRequest;
+import com.soom.backend.dto.request.UpdateUserRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.UserResponse;
 import com.soom.backend.service.UserService;
@@ -20,7 +21,7 @@ public class UserController {
 
     private final UserService userService;
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     @GetMapping
     public ResponseEntity<BaseResponse<List<UserResponse>>> getAll(){
         return ResponseEntity.ok(BaseResponse.<List<UserResponse>>builder()
@@ -30,7 +31,7 @@ public class UserController {
                 .build());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     @PostMapping
     public ResponseEntity<BaseResponse<UserResponse>> create(
             @Valid @RequestBody CreateUserRequest request){
@@ -41,10 +42,10 @@ public class UserController {
                 .build());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     @PutMapping("/{id}")
     public ResponseEntity<BaseResponse<UserResponse>> update(
-            @Valid @RequestBody CreateUserRequest request,
+            @Valid @RequestBody UpdateUserRequest request,
             @PathVariable UUID id) {
         return ResponseEntity.ok(BaseResponse.<UserResponse>builder()
                 .success(true)
@@ -53,7 +54,7 @@ public class UserController {
                 .build());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('admin')")
     @DeleteMapping("/{id}")
     public ResponseEntity<BaseResponse<Void>> delete(@PathVariable UUID id) {
         userService.deleteUser(id);
