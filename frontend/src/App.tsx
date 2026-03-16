@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import api from './services/api'
 import UnitsPage from './pages/UnitsPage'
 import CategoriesPage from './pages/CategoriesPage'
+import UserManagementPage from './pages/UserManagementPage'
 
 
 export default function App() {
@@ -73,6 +74,7 @@ export default function App() {
         <Route path={ROUTES.PRODUCT_RECIPE_HISTORY} element={<ProductRecipeHistoryPage />} />
         <Route path={ROUTES.UNITS} element={<UnitsPage />} />
         <Route path={ROUTES.CATEGORIES} element={<CategoriesPage />} />
+        <Route path={ROUTES.USERS} element={<UserManagementPage/>}/>
       </Route>
 
       {/* Fallback */}

@@ -12,4 +12,5 @@ export const ROUTES = {
     PRODUCT_RECIPE_HISTORY: '/products/:id/recipes',
     UNITS: '/settings/units',
     CATEGORIES: '/settings/categories',
+    USERS: '/admin/users',
 }
