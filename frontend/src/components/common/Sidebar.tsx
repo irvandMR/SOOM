@@ -5,133 +5,126 @@ import { useBreakpoint } from '../../hooks/useBreakpoint'
 import { useAuthStore } from '../../store/useAuthStore'
 import { ROUTES } from '../../constants/routes'
 
-const mainMenuItems = [
-  {
-    label: 'Dashboard', path: ROUTES.DASHBOARD,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <rect x="1" y="1" width="6" height="6" rx="1.2" fill="currentColor"/>
-        <rect x="9" y="1" width="6" height="6" rx="1.2" fill="currentColor"/>
-        <rect x="1" y="9" width="6" height="6" rx="1.2" fill="currentColor"/>
-        <rect x="9" y="9" width="6" height="6" rx="1.2" fill="currentColor"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Order', path: ROUTES.ORDERS,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <path d="M2 4h12M2 8h9M2 12h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Stok Bahan Baku', path: ROUTES.INGREDIENTS,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <path d="M3 3h10v10H3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-        <path d="M6 3v10M3 7h10" stroke="currentColor" strokeWidth="1.3"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Produk & Resep', path: ROUTES.PRODUCTS,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-        <path d="M5 3V2M11 3V2M2 7h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Produksi', path: ROUTES.PRODUCTIONS,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <path d="M3 13V8m4 5V5m4 8V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Keuangan', path: ROUTES.CASH_FLOW,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3"/>
-        <path d="M8 5v3l2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
-]
-
-const adminMenuItems = [
-  {
-    label: 'Units', path: ROUTES.UNITS,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <path d="M4 8h8M4 5h8M4 11h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Kategori', path: ROUTES.CATEGORIES,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-        <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-        <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-        <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-        <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
-      </svg>
-    ),
-  },
-]
-
-const MenuList = ({
-  items, collapsed, onClose, sectionLabel
-}: {
-  items: typeof mainMenuItems
+interface SidebarContentProps {
   collapsed: boolean
   onClose?: () => void
-  sectionLabel?: string
-}) => (
-  <>
-    {sectionLabel && !collapsed && (
-      <div style={{
-        fontSize: 10, fontWeight: 600,
-        color: 'var(--sidebar-muted)',
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-        padding: '8px 16px 4px',
-      }}>
-        {sectionLabel}
-      </div>
-    )}
-    {items.map((item) => (
-      <NavLink
-        key={item.path}
-        to={item.path}
-        end={item.path === '/'}
-        onClick={onClose}
-        style={({ isActive }) => ({
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: collapsed ? '10px 0' : '8px 16px',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          color: isActive ? 'var(--sidebar-text)' : 'var(--sidebar-muted)',
-          background: isActive ? 'var(--sidebar-active)' : 'transparent',
-          borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-          fontWeight: isActive ? 600 : 400,
-          fontSize: 13, textDecoration: 'none',
-          whiteSpace: 'nowrap', transition: 'all 0.13s',
-        })}
-      >
-        {item.icon}
-        {!collapsed && <span>{item.label}</span>}
-      </NavLink>
-    ))}
-  </>
-)
+}
 
-const SidebarContent = ({ collapsed, onClose }: { collapsed: boolean; onClose?: () => void }) => {
+const menuGroups = [
+  {
+    label: 'Main Menu',
+    permission: 'all',
+    children: [
+      {
+        label: 'Dashboard', path: ROUTES.DASHBOARD, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <rect x="1" y="1" width="6" height="6" rx="1.2" fill="currentColor"/>
+            <rect x="9" y="1" width="6" height="6" rx="1.2" fill="currentColor"/>
+            <rect x="1" y="9" width="6" height="6" rx="1.2" fill="currentColor"/>
+            <rect x="9" y="9" width="6" height="6" rx="1.2" fill="currentColor"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Order', path: ROUTES.ORDERS, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <path d="M2 4h12M2 8h9M2 12h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Stok Bahan Baku', path: ROUTES.INGREDIENTS, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <path d="M3 3h10v10H3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+            <path d="M6 3v10M3 7h10" stroke="currentColor" strokeWidth="1.3"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Produk & Resep', path: ROUTES.PRODUCTS, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+            <path d="M5 3V2M11 3V2M2 7h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Produksi', path: ROUTES.PRODUCTIONS, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <path d="M3 13V8m4 5V5m4 8V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Keuangan', path: ROUTES.CASH_FLOW, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3"/>
+            <path d="M8 5v3l2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: 'Settings',
+    permission: 'all',
+    children: [
+      {
+        label: 'Units', path: ROUTES.UNITS, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <path d="M4 8h8M4 5h8M4 11h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Kategori', path: ROUTES.CATEGORIES, permission: 'all',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: 'Administrator',
+    permission: 'admin',
+    children: [
+      {
+        label: 'User Management', path: ROUTES.USERS, permission: 'admin',
+        icon: (
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
+            <path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+    ],
+  },
+]
+
+const SidebarContent = ({ collapsed, onClose } : SidebarContentProps) => {
   const { user } = useAuthStore()
-  const isAdmin = user?.role === 'admin'
+  const role = user?.role
+
+  const filteredMenu = menuGroups
+    .filter(group => group.permission === 'all' || group.permission === role)
+    .map(group => ({
+      ...group,
+      children: group.children.filter(
+        item => item.permission === 'all' || item.permission === role
+      ),
+    }))
 
   return (
     <>
@@ -164,45 +157,66 @@ const SidebarContent = ({ collapsed, onClose }: { collapsed: boolean; onClose?: 
 
       {/* Menu */}
       <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto', overflowX: 'hidden' }}>
-        <MenuList
-          items={mainMenuItems}
-          collapsed={collapsed}
-          onClose={onClose}
-          sectionLabel="Main Menu"
-        />
-
-        {/* Admin Only */}
-        {isAdmin && (
-          <>
-            <div style={{ borderTop: '1px solid var(--sidebar-border)', margin: '8px 0' }} />
-            <MenuList
-              items={adminMenuItems}
-              collapsed={collapsed}
-              onClose={onClose}
-              sectionLabel="Settings"
-            />
-          </>
-        )}
+        {filteredMenu.map((group, index) => (
+          <div key={group.label}>
+            {index > 0 && (
+              <div style={{ borderTop: '1px solid var(--sidebar-border)', margin: '8px 0' }} />
+            )}
+            {!collapsed && (
+              <div style={{
+                fontSize: 10, fontWeight: 600,
+                color: 'var(--sidebar-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+                padding: '8px 16px 4px',
+              }}>
+                {group.label}
+              </div>
+            )}
+            {group.children.map(item => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === '/'}
+                onClick={onClose}
+                style={({ isActive }) => ({
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: collapsed ? '10px 0' : '8px 16px',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  color: isActive ? 'var(--sidebar-text)' : 'var(--sidebar-muted)',
+                  background: isActive ? 'var(--sidebar-active)' : 'transparent',
+                  borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+                  fontWeight: isActive ? 600 : 400,
+                  fontSize: 13, textDecoration: 'none',
+                  whiteSpace: 'nowrap', transition: 'all 0.13s',
+                })}
+              >
+                {item.icon}
+                {!collapsed && <span>{item.label}</span>}
+              </NavLink>
+            ))}
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
-    <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '12px 16px' }}>
+      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '12px 16px' }}>
         <div style={{
-            display: 'flex', alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: 6,
+          display: 'flex', alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          gap: 6,
         }}>
-            <div style={{
+          <div style={{
             width: 6, height: 6, borderRadius: '50%',
             background: '#4CAF50', flexShrink: 0,
-            }} />
-            {!collapsed && (
+          }} />
+          {!collapsed && (
             <span style={{ fontSize: 10, color: 'var(--sidebar-muted)', fontWeight: 500, letterSpacing: 0.5 }}>
-                SOOM v1.0.0
+              SOOM v1.0.0
             </span>
-            )}
+          )}
         </div>
-    </div>
+      </div>
     </>
   )
 }

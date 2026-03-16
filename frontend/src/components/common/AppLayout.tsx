@@ -16,6 +16,7 @@ const breadcrumbMap: Record<string, string[]> = {
   '/cash-flow': ['Main Menu', 'Keuangan'],
   '/settings/units': ['Settings', 'Units'],
   '/settings/categories': ['Settings', 'Kategori'],
+  '/admin/users': ['Administrator', 'User Management'],
 }
 
 export default function AppLayout() {

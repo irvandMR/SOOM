@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Chart } from 'primereact/chart'
 import api from '../services/api'
 import { formatRupiah, formatDate } from '../utils/format'
+import { useBreakpoint } from '../hooks/useBreakpoint'
+
 
 interface SummaryData {
   totalOrdersToday: number
@@ -104,18 +106,22 @@ export default function DashboardPage() {
   const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const [recentProductions, setRecentProductions] = useState<any[]>([])
+  const { isMobile } = useBreakpoint()
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [summaryRes, ordersRes, alertsRes] = await Promise.all([
+        const [summaryRes, ordersRes, alertsRes, prodRes] = await Promise.all([
           api.get('/dashboard/summary'),
           api.get('/dashboard/recent-orders'),
           api.get('/dashboard/stock-alerts'),
+          api.get('/productions'),
         ])
         setSummary(summaryRes.data.data)
         setRecentOrders(ordersRes.data.data)
         setStockAlerts(alertsRes.data.data)
+        setRecentProductions(prodRes.data.data.slice(0, 5))
       } catch (err) {
         console.error(err)
       } finally {
@@ -239,65 +245,123 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Order Terbaru */}
-          <div style={{
-            background: 'var(--white)',
-            border: '1px solid var(--border)',
-            borderRadius: 10,
-            padding: 16,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Order Terbaru</span>
-              <span onClick={() => navigate('/orders')} style={{ fontSize: 11, color: 'var(--accent)', cursor: 'pointer' }}>
-                Lihat semua →
-              </span>
+          {/* Kiri Bawah — Order + Produksi */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+
+            {/* Order Terbaru */}
+            <div style={{
+                background: 'var(--white)',
+                border: '1px solid var(--border)',
+                borderRadius: 10, padding: 16,
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Order Terbaru</span>
+                <span onClick={() => navigate('/orders')} style={{ fontSize: 11, color: 'var(--accent)', cursor: 'pointer' }}>
+                    Lihat semua →
+                </span>
+                </div>
+                {recentOrders.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
+                    Belum ada order
+                </div>
+                ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {recentOrders.map((order) => (
+                    <div
+                        key={order.id}
+                        onClick={() => navigate('/orders')}
+                        style={{
+                        background: 'var(--sidebar-bg)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8, padding: '10px 12px',
+                        display: 'flex', justifyContent: 'space-between',
+                        alignItems: 'center', cursor: 'pointer',
+                        }}
+                    >
+                        <div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
+                            {order.customerName}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {formatDate(order.orderDate)} · {order.orderNumber}
+                        </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                        <span style={{
+                            fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
+                            background: statusMap[order.status]?.bg ?? '#f5f5f5',
+                            color: statusMap[order.status]?.color ?? '#666',
+                            display: 'block', marginBottom: 3,
+                        }}>
+                            {statusMap[order.status]?.label ?? order.status}
+                        </span>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {formatRupiah(order.totalAmount)}
+                        </div>
+                        </div>
+                    </div>
+                    ))}
+                </div>
+                )}
             </div>
-            {recentOrders.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
-                Belum ada order
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {recentOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    onClick={() => navigate(`/orders/${order.id}`)}
-                    style={{
-                      background: 'var(--sidebar-bg)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      padding: '10px 12px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
-                        {order.customerName}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                        {formatDate(order.orderDate)} · {order.orderNumber}
-                      </div>
+
+            {/* Produksi Terbaru */}
+            <div style={{
+                background: 'var(--white)',
+                border: '1px solid var(--border)',
+                borderRadius: 10, padding: 16,
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Produksi Terbaru</span>
+                <span onClick={() => navigate('/productions')} style={{ fontSize: 11, color: 'var(--accent)', cursor: 'pointer' }}>
+                    Lihat semua →
+                </span>
+                </div>
+                {recentProductions.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
+                    Belum ada produksi
+                </div>
+                ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {recentProductions.map((prod) => (
+                    <div
+                        key={prod.id}
+                        onClick={() => navigate('/productions')}
+                        style={{
+                        background: 'var(--sidebar-bg)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8, padding: '10px 12px',
+                        display: 'flex', justifyContent: 'space-between',
+                        alignItems: 'center', cursor: 'pointer',
+                        }}
+                    >
+                        <div>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
+                            {prod.productName}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {formatDate(prod.productionDate)} · Versi {prod.recipeVersion}
+                        </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                        <span style={{
+                            fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
+                            background: prod.status === 'SUCCESS' ? '#E8F5E9' : '#FFEBEE',
+                            color: prod.status === 'SUCCESS' ? '#2E7D32' : '#C62828',
+                            display: 'block', marginBottom: 3,
+                        }}>
+                            {prod.status === 'SUCCESS' ? 'Sukses' : 'Gagal'}
+                        </span>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {prod.quantityProduced} unit
+                        </div>
+                        </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{
-                        fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
-                        background: statusMap[order.status]?.bg ?? '#f5f5f5',
-                        color: statusMap[order.status]?.color ?? '#666',
-                        display: 'block', marginBottom: 3,
-                      }}>
-                        {statusMap[order.status]?.label ?? order.status}
-                      </span>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                        {formatRupiah(order.totalAmount)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                    ))}
+                </div>
+                )}
+            </div>
+
           </div>
         </div>
 

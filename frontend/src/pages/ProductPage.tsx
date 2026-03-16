@@ -353,7 +353,7 @@ export default function ProductPage() {
                   Resep Aktif
                 </div>
                 <Button
-                  label="Lihat Semua Versi >>"
+                  label="Lihat Semua Versi →"
                   variant="ghost"
                   size="small"
                   onClick={() => {
@@ -416,7 +416,7 @@ export default function ProductPage() {
                   Resep Aktif
                 </div>
                 <Button
-                  label="Lihat History Lengkap >>"
+                  label="Lihat History Lengkap →"
                   variant="ghost"
                   size="small"
                   onClick={() => {

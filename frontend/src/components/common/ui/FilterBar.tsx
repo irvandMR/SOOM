@@ -1,7 +1,7 @@
 import { InputText } from 'primereact/inputtext'
 import { Dropdown } from 'primereact/dropdown'
 import { Calendar } from 'primereact/calendar'
-import { X } from 'lucide-react'
+import { X, RefreshCw } from 'lucide-react'
 import Button from './Button'
 
 export interface FilterOption {
@@ -32,30 +32,55 @@ interface FilterBarProps {
   config: FilterConfig
   onReset: () => void
   hasActiveFilter: boolean
+  onRefresh?: () => void
 }
 
-export default function FilterBar({ config, onReset, hasActiveFilter }: FilterBarProps) {
+export default function FilterBar({
+  config,
+  onReset,
+  hasActiveFilter,
+  onRefresh
+}: FilterBarProps) {
   return (
-    <div style={{
-      background: 'var(--white)',
-      border: '1px solid var(--border)',
-      borderRadius: 10,
-      padding: '12px 16px',
-      marginBottom: 16,
-      display: 'flex',
-      gap: 10,
-      flexWrap: 'wrap',
-      alignItems: 'center',
-    }}>
+    <div
+      style={{
+        background: 'var(--white)',
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        padding: '12px 16px',
+        marginBottom: 16,
+        display: 'flex',
+        gap: 10,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+      }}
+    >
+
+      {/* Refresh */}
+      {onRefresh && (
+        <Button
+          icon={<RefreshCw size={12} />}
+          variant="secondary"
+          size="normal"
+          onClick={onRefresh}
+        />
+      )}
+      
       {/* Search */}
       {config.search && (
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <i className="pi pi-search" style={{
-            position: 'absolute', left: 10, top: '50%',
-            transform: 'translateY(-50%)',
-            fontSize: 12, color: 'var(--muted)',
-            zIndex: 1,
-          }}/>
+          <i
+            className="pi pi-search"
+            style={{
+              position: 'absolute',
+              left: 10,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: 12,
+              color: 'var(--muted)',
+              zIndex: 1,
+            }}
+          />
           <InputText
             value={config.search.value}
             onChange={(e) => config.search!.onChange(e.target.value)}
@@ -69,7 +94,9 @@ export default function FilterBar({ config, onReset, hasActiveFilter }: FilterBa
       {config.dateRange && (
         <Calendar
           value={config.dateRange.value}
-          onChange={(e) => config.dateRange!.onChange(e.value as [Date | null, Date | null])}
+          onChange={(e) =>
+            config.dateRange!.onChange(e.value as [Date | null, Date | null])
+          }
           selectionMode="range"
           readOnlyInput
           placeholder={config.dateRange.placeholder ?? 'Filter tanggal'}
