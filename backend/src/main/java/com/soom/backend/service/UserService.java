@@ -7,6 +7,7 @@ import com.soom.backend.dto.response.UserResponse;
 import com.soom.backend.entity.UserEntity;
 import com.soom.backend.repository.UserRepository;
 import com.soom.backend.utils.AuthUtil;
+import com.soom.backend.utils.PasswordGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +23,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthUtil authUtil;
+    private final EmailService emailService;
 
 
     public List<UserResponse> getAll(){
@@ -47,6 +49,8 @@ public class UserService {
             throw new RuntimeException("Nama sudah terdaftar");
         }
 
+//        String rawPassword = PasswordGenerator.generate();
+
         UserEntity user = new UserEntity();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
@@ -55,6 +59,13 @@ public class UserService {
         user.setIsActive(request.getIsActive());
 
         userRepository.save(user);
+
+        // kirim email welcome
+//        emailService.sendWelcomeEmail(
+//                request.getEmail(),
+//                request.getName(),
+//                rawPassword
+//        );
 
         return UserResponse.builder()
                 .id(user.getId())

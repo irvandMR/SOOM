@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -23,4 +24,7 @@ public class CreateProductionRequest {
     private LocalDate productionDate;
 
     private String notes;
+
+    @NotNull(message = "Tanggal expired tidak boleh kosong")
+    private LocalDateTime expiredDate;
 }

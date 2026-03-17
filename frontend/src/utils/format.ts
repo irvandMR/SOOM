@@ -30,3 +30,13 @@ export const formatNumber = (num: number, decimals = 0): string =>
 
 export const formatPercent = (num: number): string =>
   `${num.toFixed(1)}%`
+
+export const toLocalDateTimeString =(date: Date): string => {
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  const ss = String(date.getSeconds()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}` // format LocalDateTime Java
+}

@@ -1,26 +1,14 @@
 import { useEffect, useState } from 'react'
-import { InputText } from 'primereact/inputtext'
-import { Dropdown } from 'primereact/dropdown'
-import { InputNumber } from 'primereact/inputnumber'
 import { TrendingUp, TrendingDown, Wallet, FileSpreadsheet, FileText, Plus } from 'lucide-react'
 import api from '../services/api'
-import type { CashFlow, CashFlowSummary, MonthlyReport, ManualCashFlowRequest } from '../types/cashflow.types'
+import type { CashFlow, CashFlowSummary, MonthlyReport } from '../types/cashflow.types'
 import { formatRupiah, formatDate } from '../utils/format'
 import Table from '../components/common/ui/Table'
-import Modal from '../components/common/ui/Modal'
-import FormField from '../components/common/ui/FormField'
 import StatusBadge from '../components/common/ui/StatusBadge'
 import FilterBar from '../components/common/ui/FilterBar'
 import Button from '../components/common/ui/Button'
 import { toast } from '../store/useToastStore'
-
-const categoryOptions = [
-  { label: 'Penjualan', value: 'Penjualan' },
-  { label: 'Pembelian Bahan', value: 'Pembelian Bahan' },
-  { label: 'Operasional', value: 'Operasional' },
-  { label: 'Gaji', value: 'Gaji' },
-  { label: 'Lainnya', value: 'Lainnya' },
-]
+import CreateManualCashFlow from '../components/cashflow/createManualCashFlow'
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
@@ -29,8 +17,6 @@ export default function CashFlowPage() {
   const [summary, setSummary] = useState<CashFlowSummary | null>(null)
   const [monthly, setMonthly] = useState<MonthlyReport[]>([])
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'list' | 'monthly'>('list')
 
@@ -39,14 +25,6 @@ export default function CashFlowPage() {
   const [filterType, setFilterType] = useState('')
   const [filterDateRange, setFilterDateRange] = useState<[Date | null, Date | null]>([null, null])
 
-  const defaultForm: ManualCashFlowRequest = {
-    type: 'IN',
-    category: '',
-    amount: 0,
-    description: '',
-    transactionDate: new Date().toISOString().split('T')[0],
-  }
-  const [form, setForm] = useState<ManualCashFlowRequest>(defaultForm)
 
   const fetchAll = async () => {
     try {
@@ -67,19 +45,11 @@ export default function CashFlowPage() {
 
   useEffect(() => { fetchAll() }, [])
 
-  const handleSubmit = async () => {
-    setError('')
-    setSubmitting(true)
-    try {
-      await api.post('/cash-flows', form)
-      await fetchAll()
-      setShowModal(false)
-      setForm(defaultForm)
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal menyimpan transaksi')
-    } finally {
-      setSubmitting(false)
-    }
+
+
+  const handleSubmitSucces = async () => {
+    await fetchAll()
+    setShowModal(false)
   }
 
   const hasActiveFilter = !!(search || filterType || filterDateRange[0])
@@ -279,67 +249,12 @@ export default function CashFlowPage() {
       )}
 
       {/* Modal */}
-      <Modal
+
+      <CreateManualCashFlow
         visible={showModal}
-        onHide={() => { setShowModal(false); setError(''); setForm(defaultForm) }}
-        title="Input Transaksi Manual"
-        onConfirm={handleSubmit}
-        confirmLabel="Simpan"
-        loading={submitting}
-        width="440px"
-      >
-        <FormField label="Tipe" required>
-          <Dropdown
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.value })}
-            options={[{ label: 'Pemasukan', value: 'IN' }, { label: 'Pengeluaran', value: 'OUT' }]}
-            className="w-full"
-          />
-        </FormField>
-
-        <FormField label="Kategori" required>
-          <Dropdown
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.value })}
-            options={categoryOptions}
-            placeholder="Pilih kategori"
-            className="w-full"
-          />
-        </FormField>
-
-        <FormField label="Jumlah" required>
-          <InputNumber
-            value={form.amount}
-            onValueChange={(e) => setForm({ ...form, amount: e.value ?? 0 })}
-            prefix="Rp "
-            className="w-full"
-          />
-        </FormField>
-
-        <FormField label="Deskripsi" required>
-          <InputText
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Keterangan transaksi..."
-            className="w-full"
-          />
-        </FormField>
-
-        <FormField label="Tanggal" required>
-          <InputText
-            type="date"
-            value={form.transactionDate}
-            onChange={(e) => setForm({ ...form, transactionDate: e.target.value })}
-            className="w-full"
-          />
-        </FormField>
-
-        {error && (
-          <div style={{ background: '#FFEBEE', color: '#C62828', fontSize: 12, padding: '8px 10px', borderRadius: 6 }}>
-            {error}
-          </div>
-        )}
-      </Modal>
+        onHide={() =>setShowModal(false)}
+        onSuccess={() => handleSubmitSucces()}
+      />
     </div>
   )
 }
