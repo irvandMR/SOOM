@@ -83,6 +83,7 @@ public class ProductionService {
         production.setProductionDate(request.getProductionDate());
         production.setStatus(ProductionStatus.SUCCESS);
         production.setNotes(request.getNotes());
+        production.setExpiredDate(request.getExpiredDate());
         productionRepository.save(production);
 
         //Update stok product
@@ -112,6 +113,7 @@ public class ProductionService {
                 .productionDate(production.getProductionDate())
                 .status(production.getStatus())
                 .notes(production.getNotes())
+                .expiredDate(production.getExpiredDate())
                 .build();
     }
 }

@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "productions")
@@ -36,4 +37,7 @@ public class ProductionEntity extends BaseEntity {
 
     @Column(columnDefinition = "text")
     private String notes;
+
+    @Column(name = "expired_date", nullable = false)
+    private LocalDateTime expiredDate;
 }
