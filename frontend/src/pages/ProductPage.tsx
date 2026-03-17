@@ -9,9 +9,9 @@ import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
 import Button from '../components/common/ui/Button'
 import FilterBar from '../components/common/ui/FilterBar'
-import AddProductModal from '../components/product/AddProductModal'
-import DetailProductModal from '../components/product/DetailProductModal'
-import RecipeManageModal from '../components/product/RecipeManageModal'
+import DetailProductModal from '../components/product/detailProductModal'
+import RecipeManageModal from '../components/product/recipeManageModal'
+import AddProductModal from '../components/product/addProductModal'
 
 interface Category { id: string; name: string }
 interface Unit { id: string; name: string; symbol: string }
