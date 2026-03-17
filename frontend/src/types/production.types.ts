@@ -16,4 +16,5 @@ export interface CreateProductionRequest {
   quantityProduced: number
   productionDate: string
   notes?: string
+  expiredDate : string
 }

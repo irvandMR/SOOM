@@ -1,27 +1,19 @@
 import { useEffect, useState } from 'react'
-import { InputText } from 'primereact/inputtext'
-import { Dropdown } from 'primereact/dropdown'
-import { InputNumber } from 'primereact/inputnumber'
 import api from '../services/api'
-import type { Production, CreateProductionRequest } from '../types/production.types'
+import type { Production } from '../types/production.types'
 import { formatDate } from '../utils/format'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
-import Modal from '../components/common/ui/Modal'
-import FormField from '../components/common/ui/FormField'
 import StatusBadge from '../components/common/ui/StatusBadge'
 import FilterBar from '../components/common/ui/FilterBar'
+import AddProductionModal from '../components/production/AddProductionModal'
 
 interface Product { id: string; name: string }
-interface Recipe { id: string; versionNumber: number; isActive: boolean }
 
 export default function ProductionPage() {
   const [productions, setProductions] = useState<Production[]>([])
   const [products, setProducts] = useState<Product[]>([])
-  const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
   const [showModal, setShowModal] = useState(false)
 
   // Filter
@@ -29,30 +21,10 @@ export default function ProductionPage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterDateRange, setFilterDateRange] = useState<[Date | null, Date | null]>([null, null])
 
-  const defaultForm: CreateProductionRequest = {
-    productId: '',
-    recipeId: '',
-    quantityProduced: 1,
-    productionDate: new Date().toISOString().split('T')[0],
-    notes: '',
-  }
-  const [form, setForm] = useState<CreateProductionRequest>(defaultForm)
 
   const fetchProductions = async () => {
     const res = await api.get('/productions')
     setProductions(res.data.data)
-  }
-
-  const fetchRecipesByProduct = async (productId: string) => {
-    try {
-      const res = await api.get(`/products/${productId}/recipes`)
-      setRecipes(res.data.data)
-      // Auto pilih resep aktif
-      const activeRecipe = res.data.data.find((r: Recipe) => r.isActive)
-      if (activeRecipe) setForm(prev => ({ ...prev, recipeId: activeRecipe.id }))
-    } catch (err) {
-      console.error(err)
-    }
   }
 
   useEffect(() => {
@@ -73,21 +45,6 @@ export default function ProductionPage() {
     fetchAll()
   }, [])
 
-  const handleSubmit = async () => {
-    setError('')
-    setSubmitting(true)
-    try {
-      await api.post('/productions', form)
-      await fetchProductions()
-      setShowModal(false)
-      setForm(defaultForm)
-      setRecipes([])
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal catat produksi')
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   const hasActiveFilter = !!(search || filterStatus || filterDateRange[0])
 
@@ -156,81 +113,12 @@ export default function ProductionPage() {
         emptyMessage="Belum ada data produksi"
       />
 
-      {/* Modal */}
-      <Modal
+      <AddProductionModal
         visible={showModal}
-        onHide={() => { setShowModal(false); setError(''); setForm(defaultForm); setRecipes([]) }}
-        title="Catat Produksi Baru"
-        onConfirm={handleSubmit}
-        confirmLabel="Simpan"
-        loading={submitting}
-        width="460px"
-      >
-        <FormField label="Produk" required>
-          <Dropdown
-            value={form.productId}
-            onChange={(e) => {
-              setForm({ ...form, productId: e.value, recipeId: '' })
-              fetchRecipesByProduct(e.value)
-            }}
-            options={products}
-            optionLabel="name"
-            optionValue="id"
-            placeholder="Pilih produk"
-            className="w-full"
-          />
-        </FormField>
-
-        <FormField label="Resep" required>
-          <Dropdown
-            value={form.recipeId}
-            onChange={(e) => setForm({ ...form, recipeId: e.value })}
-            options={recipes.map(r => ({
-              label: `Versi ${r.versionNumber}${r.isActive ? ' (Aktif)' : ''}`,
-              value: r.id,
-            }))}
-            placeholder={form.productId ? 'Pilih resep' : 'Pilih produk dulu'}
-            disabled={!form.productId}
-            className="w-full"
-          />
-        </FormField>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <FormField label="Jumlah Produksi" required>
-            <InputNumber
-              value={form.quantityProduced}
-              onValueChange={(e) => setForm({ ...form, quantityProduced: e.value ?? 1 })}
-              min={1}
-              minFractionDigits={0}
-              maxFractionDigits={3}
-              className="w-full"
-            />
-          </FormField>
-          <FormField label="Tanggal Produksi" required>
-            <InputText
-              type="date"
-              value={form.productionDate}
-              onChange={(e) => setForm({ ...form, productionDate: e.target.value })}
-              className="w-full"
-            />
-          </FormField>
-        </div>
-
-        <FormField label="Catatan">
-          <InputText
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="Catatan produksi..."
-            className="w-full"
-          />
-        </FormField>
-
-        {error && (
-          <div style={{ background: '#FFEBEE', color: '#C62828', fontSize: 12, padding: '8px 10px', borderRadius: 6 }}>
-            {error}
-          </div>
-        )}
-      </Modal>
+        onHide={() => setShowModal(false)}
+        onSuccess={fetchProductions}
+        products={products}
+      />
     </div>
   )
 }

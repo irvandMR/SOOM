@@ -1,21 +1,17 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { InputText } from 'primereact/inputtext'
-import { Dropdown } from 'primereact/dropdown'
-import { InputNumber } from 'primereact/inputnumber'
-import { Plus, Trash2, Eye, ChefHat } from 'lucide-react'
+import { Trash2, Eye, ChefHat } from 'lucide-react'
 import api from '../services/api'
-import type { Product, ProductRequest, Recipe, RecipeRequest, RecipeItemRequest } from '../types/product.types'
+import type { Product, Recipe } from '../types/product.types'
 import { formatRupiah } from '../utils/format'
 import { toast } from '../store/useToastStore'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
-import Modal from '../components/common/ui/Modal'
-import FormField from '../components/common/ui/FormField'
 import Button from '../components/common/ui/Button'
 import FilterBar from '../components/common/ui/FilterBar'
-import ItemRow from '../components/common/ui/ItemRow'
+import AddProductModal from '../components/product/AddProductModal'
+import DetailProductModal from '../components/product/DetailProductModal'
+import RecipeManageModal from '../components/product/RecipeManageModal'
 
 interface Category { id: string; name: string }
 interface Unit { id: string; name: string; symbol: string }
@@ -34,14 +30,11 @@ const typeLabel: Record<string, string> = {
 }
 
 export default function ProductPage() {
-  const navigate = useNavigate()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false)
@@ -55,15 +48,7 @@ export default function ProductPage() {
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('')
 
-  const defaultForm: ProductRequest = {
-    name: '', categoryId: '', unitId: '',
-    type: 'MADE_TO_ORDER', defaultPrice: 0, targetMargin: 30,
-  }
-  const [form, setForm] = useState<ProductRequest>(defaultForm)
-  const [recipeForm, setRecipeForm] = useState<RecipeRequest>({
-    notes: '',
-    items: [{ ingredientId: '', quantity: 0 }],
-  })
+ 
 
   const fetchProducts = async () => {
     const res = await api.get('/products')
@@ -104,21 +89,7 @@ export default function ProductPage() {
     fetchAll()
   }, [])
 
-  const handleAdd = async () => {
-    setError('')
-    setSubmitting(true)
-    try {
-      await api.post('/products', form)
-      await fetchProducts()
-      setShowAddModal(false)
-      setForm(defaultForm)
-      toast.success('Berhasil', 'Produk berhasil ditambahkan')
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal menambahkan produk')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+
 
   const handleDelete = (id: string) => {
     confirmDialog({
@@ -140,37 +111,10 @@ export default function ProductPage() {
     })
   }
 
-  const handleSaveRecipe = async () => {
+  const handleSuccessSaveRecipe = async() => {
     if (!selectedProduct) return
-    setError('')
-    setSubmitting(true)
-    try {
-      await api.post(`/products/${selectedProduct.id}/recipes`, recipeForm)
-      await fetchRecipes(selectedProduct.id)
-      await fetchProducts()
-      setRecipeForm({ notes: '', items: [{ ingredientId: '', quantity: 0 }] })
-      toast.success('Berhasil', 'Resep berhasil disimpan')
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Gagal simpan resep')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const addRecipeItem = () => setRecipeForm({
-    ...recipeForm,
-    items: [...recipeForm.items, { ingredientId: '', quantity: 0 }]
-  })
-
-  const removeRecipeItem = (i: number) => setRecipeForm({
-    ...recipeForm,
-    items: recipeForm.items.filter((_, idx) => idx !== i)
-  })
-
-  const updateRecipeItem = (i: number, field: keyof RecipeItemRequest, value: any) => {
-    const items = [...recipeForm.items]
-    items[i] = { ...items[i], [field]: value }
-    setRecipeForm({ ...recipeForm, items })
+    await fetchRecipes(selectedProduct.id)
+    await fetchProducts()
   }
 
   const hasActiveFilter = !!(search || filterType)
@@ -181,10 +125,6 @@ export default function ProductPage() {
     return matchSearch && matchType
   })
 
-  const activeRecipe = recipes.find(r => r.isActive)
-  const recommendedPrice = selectedProduct
-    ? selectedProduct.estimatedCost * (1 + selectedProduct.targetMargin / 100)
-    : 0
 
   const columns = [
     { header: 'Nama', field: 'name' },
@@ -269,272 +209,38 @@ export default function ProductPage() {
       <Table data={filteredProducts} columns={columns} loading={loading} emptyMessage="Belum ada produk" />
 
       {/* ── ADD MODAL ── */}
-      <Modal
+      <AddProductModal
         visible={showAddModal}
-        onHide={() => { setShowAddModal(false); setError(''); setForm(defaultForm) }}
-        title="Tambah Produk Baru"
-        onConfirm={handleAdd}
-        confirmLabel="Simpan"
-        loading={submitting}
-        width="480px"
-      >
-        <FormField label="Nama Produk" required>
-          <InputText value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nama produk" className="w-full" />
-        </FormField>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <FormField label="Kategori" required>
-            <Dropdown value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.value })} options={categories} optionLabel="name" optionValue="id" placeholder="Pilih kategori" className="w-full" />
-          </FormField>
-          <FormField label="Unit" required>
-            <Dropdown value={form.unitId} onChange={(e) => setForm({ ...form, unitId: e.value })} options={units} optionLabel="name" optionValue="id" placeholder="Pilih unit" className="w-full" />
-          </FormField>
-        </div>
-        <FormField label="Tipe Produk" required>
-          <Dropdown value={form.type} onChange={(e) => setForm({ ...form, type: e.value })} options={typeOptions} className="w-full" />
-        </FormField>
-
-        
-          <FormField label="Harga Jual" required>
-            <InputNumber value={form.defaultPrice} onValueChange={(e) => setForm({ ...form, defaultPrice: e.value ?? 0 })} prefix="Rp " className="w-full" />
-          </FormField>
-          <FormField label="Target Margin (%)">
-            <InputNumber value={form.targetMargin} onValueChange={(e) => setForm({ ...form, targetMargin: e.value ?? 30 })} suffix="%" className="w-full" />
-          </FormField>
-        
-
-        {error && <div style={{ background: '#FFEBEE', color: '#C62828', fontSize: 12, padding: '8px 10px', borderRadius: 6 }}>{error}</div>}
-      </Modal>
+        onHide={()=>setShowAddModal(false)}
+        onSuccess={fetchProducts}
+        units={units}
+        categories={categories}
+      />
+      
 
       {/* ── DETAIL MODAL ── */}
-      <Modal
-        visible={showDetailModal}
-        onHide={() => { setShowDetailModal(false); setSelectedProduct(null) }}
-        title={selectedProduct?.name ?? 'Detail Produk'}
-        width="500px"
-      >
-        {selectedProduct && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Info */}
-            <div style={{ background: 'var(--sidebar-bg)', borderRadius: 8, padding: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {[
-                  { label: 'Kategori', value: selectedProduct.categoryName },
-                  { label: 'Unit', value: selectedProduct.unitName },
-                  { label: 'Tipe', value: typeLabel[selectedProduct.type] },
-                  { label: 'Stok', value: `${selectedProduct.stockQuantity} ${selectedProduct.unitName}` },
-                ].map(({ label, value }) => (
-                  <div key={label}>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>{label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Estimasi */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[
-                { label: 'Harga Jual', value: formatRupiah(selectedProduct.defaultPrice), color: 'var(--accent)' },
-                { label: 'Est. Modal', value: formatRupiah(selectedProduct.estimatedCost), color: 'var(--text)' },
-                { label: 'Rek. Harga', value: formatRupiah(recommendedPrice), color: '#2E7D32' },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ background: 'var(--sidebar-bg)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color }}>{value}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Resep Aktif saja */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Resep Aktif
-                </div>
-                <Button
-                  label="Lihat Semua Versi →"
-                  variant="ghost"
-                  size="small"
-                  onClick={() => {
-                    setShowDetailModal(false)
-                    navigate(`/products/${selectedProduct.id}/recipes`)
-                  }}
-                />
-              </div>
-
-              {recipeLoading ? (
-                <div style={{ textAlign: 'center', padding: 20 }}>
-                  <i className="pi pi-spin pi-spinner" style={{ color: 'var(--accent)' }} />
-                </div>
-              ) : !activeRecipe ? (
-                <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '12px 0' }}>
-                  Belum ada resep aktif —{' '}
-                  <span
-                    onClick={() => { setShowDetailModal(false); setShowRecipeModal(true) }}
-                    style={{ color: 'var(--accent)', cursor: 'pointer' }}
-                  >
-                    Tambah resep
-                  </span>
-                </div>
-              ) : (
-                <div style={{ border: '1px solid #A5D6A7', borderRadius: 8, padding: 12, background: '#F0FFF4' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Versi {activeRecipe.versionNumber}</span>
-                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#E8F5E9', color: '#2E7D32', fontWeight: 500 }}>Aktif</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Est. {formatRupiah(activeRecipe.estimatedCost)}</span>
-                  </div>
-                  {activeRecipe.items.map(item => (
-                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderTop: '1px solid var(--border)' }}>
-                      <span>{item.ingredientName}</span>
-                      <span style={{ color: 'var(--muted)' }}>{item.quantity} {item.unitSymbol}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
+      <DetailProductModal
+          visible={showDetailModal}
+          onHide={() => { setShowDetailModal(false); setSelectedProduct(null) }}
+          product={selectedProduct}
+          recipes={recipes}
+          loading={loading}
+          onRecipeModal={() => { setShowDetailModal(false); setShowRecipeModal(true) }}
+      />
+      
 
       {/* ── RECIPE MODAL ── */}
-      <Modal
+      <RecipeManageModal
         visible={showRecipeModal}
-        onHide={() => { setShowRecipeModal(false); setError('') }}
-        title={`Resep — ${selectedProduct?.name}`}
-        width="540px"
-      >
-        {selectedProduct && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Resep Aktif */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Resep Aktif
-                </div>
-                <Button
-                  label="Lihat History Lengkap →"
-                  variant="ghost"
-                  size="small"
-                  onClick={() => {
-                    setShowRecipeModal(false)
-                    navigate(`/products/${selectedProduct.id}/recipes`)
-                  }}
-                />
-              </div>
-
-              {recipeLoading ? (
-                <div style={{ textAlign: 'center', padding: 16 }}>
-                  <i className="pi pi-spin pi-spinner" style={{ color: 'var(--accent)' }} />
-                </div>
-              ) : !activeRecipe ? (
-                <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '12px 0' }}>
-                  Belum ada resep aktif
-                </div>
-              ) : (
-                <div style={{ border: '1px solid #A5D6A7', borderRadius: 8, padding: 12, background: '#F0FFF4' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Versi {activeRecipe.versionNumber}</span>
-                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#E8F5E9', color: '#2E7D32', fontWeight: 500 }}>Aktif</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Est. {formatRupiah(activeRecipe.estimatedCost)}</span>
-                  </div>
-                  {activeRecipe.items.map(item => (
-                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderTop: '1px solid var(--border)' }}>
-                      <span>{item.ingredientName}</span>
-                      <span style={{ color: 'var(--muted)' }}>{item.quantity} {item.unitSymbol}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Tambah Versi Baru */}
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
-                Tambah Versi Resep Baru
-              </div>
-
-              <FormField label="Catatan Resep">
-                <InputText
-                  value={recipeForm.notes}
-                  onChange={(e) => setRecipeForm({ ...recipeForm, notes: e.target.value })}
-                  placeholder="Catatan versi resep ini..."
-                  className="w-full"
-                />
-              </FormField>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>Bahan-bahan</div>
-                <Button label="Tambah Bahan" icon={<Plus size={11} />} size="small" variant="secondary" onClick={addRecipeItem} />
-              </div>
-
-              {recipeForm.items.map((item, i) => {
-                const selectedIng = ingredients.find(ing => ing.id === item.ingredientId)
-                return (
-                  <ItemRow
-                    key={i}
-                    index={i}
-                    onRemove={() => removeRecipeItem(i)}
-                    showRemove={recipeForm.items.length > 1}
-                  >
-                    <FormField label="Bahan Baku" required>
-                      <Dropdown
-                        value={item.ingredientId}
-                        onChange={(e) => updateRecipeItem(i, 'ingredientId', e.value)}
-                        options={ingredients}
-                        optionLabel="name"
-                        optionValue="id"
-                        placeholder="Pilih bahan"
-                        className="w-full"
-                        itemTemplate={(opt) => (
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>{opt.name}</span>
-                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'var(--sidebar-bg)', color: 'var(--muted)' }}>
-                              {opt.unitSymbol}
-                            </span>
-                          </div>
-                        )}
-                      />
-                    </FormField>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'end' }}>
-                      <FormField label="Jumlah">
-                        <InputNumber
-                          value={item.quantity}
-                          onValueChange={(e) => updateRecipeItem(i, 'quantity', e.value ?? 0)}
-                          minFractionDigits={0}
-                          maxFractionDigits={3}
-                          className="w-full"
-                        />
-                      </FormField>
-                      {selectedIng && (
-                        <div style={{
-                          padding: '8px 12px', background: 'var(--sidebar-bg)',
-                          border: '1px solid var(--border)', borderRadius: 7,
-                          fontSize: 12, fontWeight: 600, color: 'var(--accent)',
-                          marginBottom: 5, minWidth: 48, textAlign: 'center',
-                        }}>
-                          {selectedIng.unitSymbol}
-                        </div>
-                      )}
-                    </div>
-                  </ItemRow>
-                )
-              })}
-
-              {error && <div style={{ background: '#FFEBEE', color: '#C62828', fontSize: 12, padding: '8px 10px', borderRadius: 6, marginBottom: 8 }}>{error}</div>}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                <Button label="Simpan Resep" icon={<Plus size={12} />} onClick={handleSaveRecipe} loading={submitting} />
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+        onHide={() => { setShowRecipeModal(false) }}
+        onSuccess={() => handleSuccessSaveRecipe()}
+        recipes={recipes}
+        product={selectedProduct}
+        onRecipeModal={() => setShowRecipeModal(false)}
+        loading={recipeLoading}
+        ingredients={ingredients}
+      />
+      
     </div>
   )
 }
