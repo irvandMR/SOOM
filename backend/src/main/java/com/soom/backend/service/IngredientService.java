@@ -2,6 +2,7 @@ package com.soom.backend.service;
 
 import com.soom.backend.dto.request.IngredientRequest;
 import com.soom.backend.dto.request.StockInRequest;
+import com.soom.backend.dto.request.UpdateIngredientRequest;
 import com.soom.backend.dto.response.IngredientResponse;
 import com.soom.backend.dto.response.IngredientHistoryResponse;
 import com.soom.backend.entity.*;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,7 +44,9 @@ public class IngredientService {
     }
 
     public IngredientResponse create(IngredientRequest request) {
-        if (ingredientRepository.existsByName(request.getName())) {
+        IngredientsEntity ingredients = ingredientRepository.findFirstByNameOrderByIdDesc(request.getName());
+
+        if (ingredients != null && !ingredients.getIsDeleted()) {
             throw new RuntimeException("Nama bahan baku sudah ada");
         }
 
@@ -64,21 +68,27 @@ public class IngredientService {
         return toResponse(ingredient);
     }
 
-    public IngredientResponse update(UUID id, IngredientRequest request) {
+    public IngredientResponse update(UUID id, UpdateIngredientRequest request) {
         IngredientsEntity ingredient = findById(id);
 
         CategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Kategori tidak ditemukan"));
 
+
         UnitsEntity unit = unitRepository.findById(request.getUnitId())
                 .orElseThrow(() -> new RuntimeException("Unit tidak ditemukan"));
+
 
         ingredient.setName(request.getName());
         ingredient.setCategory(category);
         ingredient.setUnit(unit);
         ingredient.setMinimumStock(request.getMinimumStock());
+        ingredient.setStockQuantity(request.getStockQuantity());
+        ingredient.setPurchasePrice(request.getPurchasePrice());
         ingredient.setUpdatedBy(authUtil.getCurrentUserEmail());
+        ingredient.setUpdatedAt(LocalDateTime.now());
 
+        // Simpan
         ingredientRepository.save(ingredient);
 
         return toResponse(ingredient);
@@ -137,6 +147,7 @@ public class IngredientService {
 
         ingredient.setStockQuantity(newStock);
         ingredient.setAvgPurchasePrice(newAvgPrice);
+        ingredient.setPurchasePrice(request.getPurchasePrice());
         ingredientRepository.save(ingredient);
 
         return toResponse(ingredient);
@@ -171,6 +182,9 @@ public class IngredientService {
                 .stockQuantity(ingredient.getStockQuantity())
                 .minimumStock(ingredient.getMinimumStock())
                 .avgPurchasePrice(ingredient.getAvgPurchasePrice())
+                .categoryId(ingredient.getCategory().getId())
+                .unitId(ingredient.getUnit().getId())
+                .purchasePrice(ingredient.getPurchasePrice())
                 .build();
     }
 }

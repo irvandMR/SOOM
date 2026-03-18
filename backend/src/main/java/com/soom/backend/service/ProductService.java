@@ -54,7 +54,6 @@ public class ProductService {
         product.setType(request.getType());
         product.setCategory(category);
         product.setUnit(units);
-        product.setDefaultPrice(request.getDefaultPrice());
         product.setTargetMargin(request.getTargetMargin());
 
         productRepository.save(product);
@@ -74,7 +73,6 @@ public class ProductService {
         product.setType(request.getType());
         product.setCategory(category);
         product.setUnit(units);
-        product.setDefaultPrice(request.getDefaultPrice());
         product.setTargetMargin(request.getTargetMargin());
 
         productRepository.save(product);
@@ -200,7 +198,6 @@ public class ProductService {
                 .type(product.getType())
                 .categoryName(product.getCategory().getName())
                 .unitName(product.getUnit().getName())
-                .defaultPrice(product.getDefaultPrice())
                 .stockQuantity(product.getStockQuantity())
                 .estimatedCost(product.getEstimatedCost())
                 .targetMargin(product.getTargetMargin())

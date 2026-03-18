@@ -13,8 +13,11 @@ public interface IngredientRepository extends JpaRepository<IngredientsEntity, U
 
     boolean existsByName(String name);
 
+
     List<IngredientsEntity> findByIsDeletedFalse();
 
     @Query("SELECT i FROM IngredientsEntity i WHERE i.isDeleted = false AND i.stockQuantity <= i.minimumStock")
     List<IngredientsEntity> findCriticalStock();
+
+    IngredientsEntity findFirstByNameOrderByIdDesc(String name);
 }
