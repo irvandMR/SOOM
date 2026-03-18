@@ -2,6 +2,7 @@ package com.soom.backend.controller;
 
 import com.soom.backend.dto.request.IngredientRequest;
 import com.soom.backend.dto.request.StockInRequest;
+import com.soom.backend.dto.request.UpdateIngredientRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.IngredientHistoryResponse;
 import com.soom.backend.dto.response.IngredientResponse;
@@ -51,7 +52,7 @@ public class IngredientController {
     @PutMapping("/{id}")
     public ResponseEntity<BaseResponse<IngredientResponse>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody IngredientRequest request) {
+            @Valid @RequestBody UpdateIngredientRequest request) {
         return ResponseEntity.ok(BaseResponse.<IngredientResponse>builder()
                 .success(true)
                 .message("Bahan baku berhasil diupdate")
