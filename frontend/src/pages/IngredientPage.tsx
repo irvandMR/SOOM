@@ -89,7 +89,7 @@ export default function IngredientPage() {
     },
     {
       header: 'Harga', body: (row: Ingredient) => (
-        <span>Rp {row.purchasePrice.toLocaleString('id-ID')}</span>
+        <span>Rp {row?.purchasePrice.toLocaleString('id-ID')}</span>
       )
     },
     {

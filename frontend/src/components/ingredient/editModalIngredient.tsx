@@ -51,8 +51,9 @@ export default function EditModalIngredient({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [unitSymbol, setUnitSymbol] = useState<string>('')
+  const [convertibleUnits, setConvertibleUnits] = useState<Unit[]>([])
 
-  // Load data ingredient saat modal muncul
+  // Load ingredient data saat modal muncul
   useEffect(() => {
     if (ingredient) {
       setForm({
@@ -63,8 +64,13 @@ export default function EditModalIngredient({
         stockQuantity: ingredient.stockQuantity ?? 0,
         purchasePrice: ingredient.purchasePrice ?? 0
       })
+
       const unit = units.find(u => u.id === ingredient.unitId)
       setUnitSymbol(unit?.symbol ?? '')
+
+      // filter unit yang bisa dikonversi dari unit saat ini
+      const convertible = units.filter(u => canConvertUnit(unit?.symbol ?? '', u.symbol))
+      setConvertibleUnits(convertible)
       setErrors({})
     }
   }, [ingredient])
@@ -79,6 +85,7 @@ export default function EditModalIngredient({
       purchasePrice: 0
     })
     setUnitSymbol('')
+    setConvertibleUnits([])
     setErrors({})
   }
 
@@ -103,12 +110,12 @@ export default function EditModalIngredient({
         stockQuantity: newStock,
         minimumStock: newMinStock
       }))
-    } else {
-      // jika tidak bisa convert, tetap ganti unit tapi nilai stock tetap
-      setForm(prev => ({ ...prev, unitId: newUnitId }))
-    }
+      setUnitSymbol(newUnit.symbol)
 
-    setUnitSymbol(newUnit.symbol)
+      // update list unit yang bisa dikonversi lagi
+      const convertible = units.filter(u => canConvertUnit(newUnit.symbol, u.symbol))
+      setConvertibleUnits(convertible)
+    }
   }
 
   const handleSave = async () => {
@@ -189,7 +196,7 @@ export default function EditModalIngredient({
         <Dropdown
           value={form.unitId}
           onChange={(e) => handleUnitChange(e.value)}
-          options={units}
+          options={convertibleUnits}
           optionLabel="name"
           optionValue="id"
           placeholder="Pilih unit"
