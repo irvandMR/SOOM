@@ -14,7 +14,7 @@ public class AddPaymentRequest {
     @NotNull(message = "Jumlah tidak boleh kosong")
     private BigDecimal amount;
 
-    @NotBlank(message = "Tipe pembayaran tidak boleh kosong")
+    @NotNull(message = "Tipe pembayaran tidak boleh kosong")
     private PaymentType paymentType; // dp | settlement
 
     @NotNull(message = "Tanggal pembayaran tidak boleh kosong")

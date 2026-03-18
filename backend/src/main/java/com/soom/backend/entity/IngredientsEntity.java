@@ -33,4 +33,7 @@ public class IngredientsEntity extends BaseEntity{
 
     @Column(name = "avg_purchase_price")
     private BigDecimal avgPurchasePrice = BigDecimal.ZERO;
+
+    @Column(name = "purchase_price")
+    private BigDecimal purchasePrice = BigDecimal.ZERO;
 }
