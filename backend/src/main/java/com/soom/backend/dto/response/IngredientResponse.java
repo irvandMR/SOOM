@@ -17,4 +17,6 @@ public class IngredientResponse {
     private BigDecimal stockQuantity;
     private BigDecimal minimumStock;
     private BigDecimal avgPurchasePrice;
+    private BigDecimal purchasePrice;
+
 }
