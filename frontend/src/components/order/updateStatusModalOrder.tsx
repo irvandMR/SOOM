@@ -22,7 +22,6 @@ interface Props {
 }
 
 export default function UpdateStatusModalOrder({ visible, onHide, onSuccess, order }: Props) {
-    console.log("order",order?.status);
     
   const [newStatus, setNewStatus] = useState(order?.status ?? '')
   const [errors, setErrors] = useState<Record<string, string>>({})

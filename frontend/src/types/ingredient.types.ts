@@ -2,11 +2,23 @@ export interface Ingredient {
   id: string
   name: string
   categoryName: string
+  categoryId: string
+  unitId: string
   unitName: string
   unitSymbol: string
   stockQuantity: number
   minimumStock: number
   avgPurchasePrice: number
+  purchasePrice: number
+}
+
+export interface IngredientUpdateRequest {
+  name: string                  
+  categoryId: string            
+  unitId: string                 
+  minimumStock: number         
+  stockQuantity: number          
+  purchasePrice: number        
 }
 
 export interface StockHistory {
@@ -32,3 +44,4 @@ export interface StockInRequest {
   purchasePrice: number
   notes?: string
 }
+

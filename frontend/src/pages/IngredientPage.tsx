@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, Pencil } from 'lucide-react'
 import api from '../services/api'
 import { toast } from '../store/useToastStore'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
@@ -10,6 +10,7 @@ import StatusBadge from '../components/common/ui/StatusBadge'
 import AddModalIngredient from '../components/ingredient/addModalIngredient'
 import StockInModalIngredient from '../components/ingredient/stockInModalIngredient'
 import type { Ingredient } from '../types/ingredient.types'
+import EditModalIngredient from '../components/ingredient/editModalIngredient'
 
 interface Category { id: string; name: string }
 interface Unit { id: string; name: string; symbol: string }
@@ -20,6 +21,7 @@ export default function IngredientPage() {
   const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [showStockInModal, setShowStockInModal] = useState(false)
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
 
@@ -86,6 +88,11 @@ export default function IngredientPage() {
       )
     },
     {
+      header: 'Harga', body: (row: Ingredient) => (
+        <span>Rp {row.purchasePrice.toLocaleString('id-ID')}</span>
+      )
+    },
+    {
       header: 'Harga Rata-rata', body: (row: Ingredient) => (
         <span>Rp {row.avgPurchasePrice.toLocaleString('id-ID')}</span>
       )
@@ -98,6 +105,14 @@ export default function IngredientPage() {
     {
       header: 'Aksi', body: (row: Ingredient) => (
         <div style={{ display: 'flex', gap: 6 }}>
+          <Button
+            label="Edit"
+            icon={<Pencil size={12} />}
+            variant="secondary"
+            size="small"
+            tooltip="Edit"
+            onClick={() => { setSelectedIngredient(row); setShowEditModal(true) }}
+          />
           <Button
             label="Stok"
             icon={<Plus size={12} />}
@@ -141,6 +156,15 @@ export default function IngredientPage() {
         onSuccess={fetchIngredients}
         categories={categories}
         units={units}
+      />
+
+      <EditModalIngredient
+        visible={showEditModal}
+        onHide={() => setShowEditModal(false)}
+        onSuccess={fetchIngredients}
+        categories={categories}
+        units={units}
+        ingredient={selectedIngredient}
       />
 
       <StockInModalIngredient
