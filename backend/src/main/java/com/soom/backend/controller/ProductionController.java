@@ -2,6 +2,7 @@ package com.soom.backend.controller;
 
 import com.soom.backend.dto.request.CreateProductionRequest;
 import com.soom.backend.dto.response.BaseResponse;
+import com.soom.backend.dto.response.ProductionDetailResponse;
 import com.soom.backend.dto.response.ProductionResponse;
 import com.soom.backend.service.ProductionService;
 import jakarta.validation.Valid;
@@ -38,6 +39,16 @@ public class ProductionController {
                 .build());
     }
 
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<BaseResponse<ProductionDetailResponse>> getDetail(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(BaseResponse.<ProductionDetailResponse>builder()
+                .success(true)
+                .message("OK")
+                .data(productionService.getDetail(id))
+                .build());
+    }
+
     @PostMapping
     public ResponseEntity<BaseResponse<ProductionResponse>> create(
             @Valid @RequestBody CreateProductionRequest request) {
@@ -45,6 +56,16 @@ public class ProductionController {
                 .success(true)
                 .message("Produksi berhasil dicatat")
                 .data(productionService.create(request))
+                .build());
+    }
+
+    @GetMapping("/available")
+    public ResponseEntity<BaseResponse<List<ProductionResponse>>> getAvailable(
+            @RequestParam UUID productId) {
+        return ResponseEntity.ok(BaseResponse.<List<ProductionResponse>>builder()
+                .success(true)
+                .message("OK")
+                .data(productionService.getAvailable(productId))
                 .build());
     }
 }

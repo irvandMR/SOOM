@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "units")
 @Getter
@@ -19,4 +21,11 @@ public class UnitsEntity extends BaseEntity{
 
     @Column(nullable = false)
     private String symbol;
+
+    @Column(nullable = false)
+    private String baseUnit;
+
+    @Column(nullable = false)
+    private BigDecimal conversionFactor;
+
 }

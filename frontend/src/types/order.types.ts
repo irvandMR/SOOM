@@ -16,6 +16,8 @@ export interface OrderItem {
   id: string
   productId: string
   productName: string
+  productionId: string | null
+  productionRecipeVersion: number | null
   quantity: number
   unitPrice: number
   subtotal: number
@@ -39,6 +41,7 @@ export interface OrderDetail extends Order {
 
 export interface OrderItemRequest {
   productId: string
+  productionId: string    // ← wajib sekarang
   quantity: number
   notes?: string
 }

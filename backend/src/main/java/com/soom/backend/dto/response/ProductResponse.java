@@ -14,9 +14,11 @@ public class ProductResponse {
     private String name;
     private ProductType type;
     private String categoryName;
-    private String unitName;
-    private BigDecimal defaultPrice;
+    private String unitName;           // unit dasar produk (pcs)
     private BigDecimal stockQuantity;
     private BigDecimal estimatedCost;
-    private BigDecimal targetMargin;
+    private Integer versionNumber;
+    private String stockUnitName;      // ← tambah — unit stok (toples)
+    private String stockUnitSymbol;
+    private String unitSymbol;
 }

@@ -18,18 +18,14 @@ interface User {
   active: boolean
 }
 
-const roleOptions = [
-  { label: 'Admin', value: 'admin' },
-  { label: 'User', value: 'user' },
-]
-
 export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [search, setSearch] = useState('')
-  const [filterRole, setFilterRole] = useState('')
-  const [filterActive, setFilterActive] = useState<string>('')
+  const [filterRole, setFilterRole] = useState('ALL')
+  const [filterActive, setFilterActive] = useState('ALL')
+  const [first, setFirst] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
@@ -41,6 +37,11 @@ export default function UserManagementPage() {
   useEffect(() => {
     fetchUsers().finally(() => setLoading(false))
   }, [])
+
+  // Reset ke halaman 1 saat filter berubah
+  useEffect(() => {
+    setFirst(0)
+  }, [search, filterRole, filterActive])
 
   const handleDelete = async (id: string) => {
     confirmDialog({
@@ -62,12 +63,10 @@ export default function UserManagementPage() {
     })
   }
 
-  const hasActiveFilter = !!(search || filterRole || filterActive !== '')
-
   const filteredUsers = users.filter(u => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase())
-    const matchRole = !filterRole || u.role === filterRole
-    const matchActive = filterActive === '' || u.active === (filterActive === 'true')
+    const matchRole = filterRole === 'ALL' || u.role === filterRole
+    const matchActive = filterActive === 'ALL' || u.active === (filterActive === 'true')
     return matchSearch && matchRole && matchActive
   })
 
@@ -105,10 +104,7 @@ export default function UserManagementPage() {
             variant="secondary"
             size="small"
             tooltip="Edit"
-            onClick={() => {
-              setEditUser(row)
-              setShowEditModal(true)
-            }}
+            onClick={() => { setEditUser(row); setShowEditModal(true) }}
           />
           {row.role !== 'admin' && (
             <Button
@@ -129,7 +125,7 @@ export default function UserManagementPage() {
     <div>
       <PageHeader
         title="User Management"
-        subtitle={`${users.length} user terdaftar`}
+        subtitle={`${filteredUsers.length} user terdaftar`}
         actionLabel="Tambah User"
         onAction={() => setShowAddModal(true)}
       />
@@ -141,14 +137,18 @@ export default function UserManagementPage() {
             {
               value: filterRole,
               onChange: setFilterRole,
-              options: [{ label: 'Semua Role', value: '' }, ...roleOptions],
+              options: [
+                { label: 'Semua Role', value: 'ALL' },
+                { label: 'Admin', value: 'admin' },
+                { label: 'User', value: 'user' },
+              ],
               placeholder: 'Role',
             },
             {
               value: filterActive,
               onChange: setFilterActive,
               options: [
-                { label: 'Semua Status', value: '' },
+                { label: 'Semua Status', value: 'ALL' },
                 { label: 'Aktif', value: 'true' },
                 { label: 'Tidak Aktif', value: 'false' },
               ],
@@ -156,8 +156,8 @@ export default function UserManagementPage() {
             },
           ],
         }}
-        onReset={() => { setSearch(''); setFilterRole(''); setFilterActive('') }}
-        hasActiveFilter={hasActiveFilter}
+        onReset={() => { setSearch(''); setFilterRole('ALL'); setFilterActive('ALL') }}
+        hasActiveFilter={!!(search || filterRole !== 'ALL' || filterActive !== 'ALL')}
         onRefresh={fetchUsers}
       />
 
@@ -166,6 +166,8 @@ export default function UserManagementPage() {
         columns={columns}
         loading={loading}
         emptyMessage="Belum ada user"
+        first={first}
+        onFirstChange={setFirst}
       />
 
       <AddModalUserManagement

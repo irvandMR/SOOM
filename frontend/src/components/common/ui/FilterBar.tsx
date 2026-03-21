@@ -93,10 +93,17 @@ export default function FilterBar({
       {/* Date Range */}
       {config.dateRange && (
         <Calendar
-          value={config.dateRange.value}
-          onChange={(e) =>
-            config.dateRange!.onChange(e.value as [Date | null, Date | null])
-          }
+          value={config.dateRange.value[0] === null ? null : config.dateRange.value}
+          onChange={(e) => {
+            const val = e.value
+            if (!val) {
+              config.dateRange!.onChange([null, null])   // ← handle null saat clear
+            } else if (Array.isArray(val)) {
+              config.dateRange!.onChange(val as [Date | null, Date | null])
+            } else {
+              config.dateRange!.onChange([val, null])    // ← handle single date
+            }
+          }}
           selectionMode="range"
           readOnlyInput
           placeholder={config.dateRange.placeholder ?? 'Filter tanggal'}
@@ -112,7 +119,7 @@ export default function FilterBar({
         <Dropdown
           key={i}
           value={dd.value}
-          onChange={(e) => dd.onChange(e.value)}
+          onChange={(e) => dd.onChange(e.value ?? '')} 
           options={dd.options}
           placeholder={dd.placeholder ?? 'Pilih...'}
           style={{ fontSize: 13, minWidth: 150 }}

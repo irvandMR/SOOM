@@ -4,9 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Entity
 @Table(name = "order_items")
@@ -22,6 +20,11 @@ public class OrderItemEntity extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private ProductEntity product;
+
+    // Produksi yang dipakai untuk order ini
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "production_id")
+    private ProductionEntity production;
 
     @Column(nullable = false)
     private BigDecimal quantity;

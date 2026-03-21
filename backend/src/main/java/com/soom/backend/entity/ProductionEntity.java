@@ -26,7 +26,7 @@ public class ProductionEntity extends BaseEntity {
     private ProductRecipesEntity recipes;
 
     @Column(name = "quantity_produced", nullable = false)
-    private BigDecimal quantityProduced;
+    private BigDecimal quantityProduced;  // dalam unit produk
 
     @Column(name = "production_date", nullable = false)
     private LocalDate productionDate;
@@ -40,4 +40,11 @@ public class ProductionEntity extends BaseEntity {
 
     @Column(name = "expired_date", nullable = false)
     private LocalDateTime expiredDate;
+
+    @Column(name = "actual_yield")
+    private BigDecimal actualYield;  // opsional
+
+    @Column(name = "available_qty")
+    private BigDecimal availableQty;  // dalam unit produk
+
 }
