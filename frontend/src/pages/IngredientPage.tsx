@@ -132,12 +132,33 @@ export default function IngredientPage() {
     {
       header: 'Aksi', body: (row: Ingredient) => (
         <div style={{ display: 'flex', gap: 6 }}>
-          <Button label="Edit" icon={<Pencil size={12} />} variant="secondary" size="small"
-            onClick={() => { setSelectedIngredient(row); setShowEditModal(true) }} />
-          <Button label="Stok" icon={<Plus size={12} />} variant="secondary" size="small"
-            onClick={() => { setSelectedIngredient(row); setShowStockInModal(true) }} />
-          <Button label="Hapus" icon={<Trash2 size={12} />} variant="danger" size="small"
-            onClick={() => handleDelete(row.id)} />
+          {/* Tombol Edit hanya muncul jika stock sudah ada */}
+          {row.stockQuantity > 0 && (
+            <Button
+              label="Edit"
+              icon={<Pencil size={12} />}
+              variant="secondary"
+              size="small"
+              tooltip="Edit"
+              onClick={() => { setSelectedIngredient(row); setShowEditModal(true) }}
+            />
+          )}
+          <Button
+            label="Stok"
+            icon={<Plus size={12} />}
+            variant="secondary"
+            size="small"
+            tooltip="Tambah Stok"
+            onClick={() => { setSelectedIngredient(row); setShowStockInModal(true) }}
+          />
+          <Button
+            label="Hapus"
+            icon={<Trash2 size={12} />}
+            variant="danger"
+            size="small"
+            tooltip="Hapus"
+            onClick={() => handleDelete(row.id)}
+          />
         </div>
       )
     },
