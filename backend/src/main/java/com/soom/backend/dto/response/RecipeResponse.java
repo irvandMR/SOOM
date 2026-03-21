@@ -16,4 +16,8 @@ public class RecipeResponse {
     private String notes;
     private List<RecipeItemResponse> items;
     private BigDecimal estimatedCost;
+    private BigDecimal estimatedYield;     // estimasi hasil per batch
+    private String yieldUnitName;          // nama satuan hasil
+    private String yieldUnitSymbol;        // simbol satuan hasil
+    private BigDecimal costPerUnit;        // estimatedCost / estimatedYield
 }

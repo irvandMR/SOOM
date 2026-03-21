@@ -16,17 +16,13 @@ interface Category {
   type: string
 }
 
-const typeOptions = [
-  { label: 'Ingredient', value: 'INGREDIENT' },
-  { label: 'Product', value: 'PRODUCT' },
-]
-
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [search, setSearch] = useState('')
-  const [filterType, setFilterType] = useState('')
+  const [filterType, setFilterType] = useState('ALL')
+  const [first, setFirst] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
@@ -38,6 +34,10 @@ export default function CategoriesPage() {
   useEffect(() => {
     fetchCategories().finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    setFirst(0)
+  }, [search, filterType])
 
   const handleDelete = async (id: string) => {
     confirmDialog({
@@ -59,11 +59,9 @@ export default function CategoriesPage() {
     })
   }
 
-  const hasActiveFilter = !!(search || filterType)
-
   const filteredCategories = categories.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase())
-    const matchType = !filterType || c.type === filterType
+    const matchType = filterType === 'ALL' || c.type === filterType
     return matchSearch && matchType
   })
 
@@ -89,10 +87,7 @@ export default function CategoriesPage() {
             variant="secondary"
             size="small"
             tooltip="Edit"
-            onClick={() => {
-              setEditCategory(row)
-              setShowEditModal(true)
-            }}
+            onClick={() => { setEditCategory(row); setShowEditModal(true) }}
           />
           <Button
             label="Hapus"
@@ -111,7 +106,7 @@ export default function CategoriesPage() {
     <div>
       <PageHeader
         title="Kategori"
-        subtitle={`${categories.length} kategori terdaftar`}
+        subtitle={`${filteredCategories.length} kategori terdaftar`}
         actionLabel="Tambah Kategori"
         onAction={() => setShowAddModal(true)}
       />
@@ -122,12 +117,16 @@ export default function CategoriesPage() {
           dropdowns: [{
             value: filterType,
             onChange: setFilterType,
-            options: [{ label: 'Semua Tipe', value: '' }, ...typeOptions],
+            options: [
+              { label: 'Semua Tipe', value: 'ALL' },
+              { label: 'Ingredient', value: 'INGREDIENT' },
+              { label: 'Product', value: 'PRODUCT' },
+            ],
             placeholder: 'Tipe',
           }],
         }}
-        onReset={() => { setSearch(''); setFilterType('') }}
-        hasActiveFilter={hasActiveFilter}
+        onReset={() => { setSearch(''); setFilterType('ALL') }}
+        hasActiveFilter={!!(search || filterType !== 'ALL')}
         onRefresh={fetchCategories}
       />
 
@@ -136,6 +135,8 @@ export default function CategoriesPage() {
         columns={columns}
         loading={loading}
         emptyMessage="Belum ada kategori"
+        first={first}
+        onFirstChange={setFirst}
       />
 
       <AddModalCategory

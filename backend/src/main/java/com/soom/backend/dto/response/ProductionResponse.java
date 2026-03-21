@@ -17,7 +17,25 @@ public class ProductionResponse {
     private String productName;
     private UUID recipeId;
     private Integer recipeVersion;
+
+    // Batch info
     private BigDecimal quantityProduced;
+    private String unitName;               // unit output produksi (toples)
+    private String unitSymbol;             // simbol unit output (toples)
+
+    // Yield info
+    private BigDecimal estimatedYield;
+    private BigDecimal actualYield;
+    private BigDecimal availableQty;
+    private String yieldUnitName;          // ← tambah — unit yield resep (pcs)
+    private String yieldUnitSymbol;        // ← tambah — simbol yield resep (pcs)
+
+    // Kalkulasi
+    private BigDecimal estimatedCostPerUnit;
+    private BigDecimal totalEstimatedCost;
+    private BigDecimal recommendedPrice;
+    private BigDecimal recommendedPricePerUnit;
+
     private LocalDate productionDate;
     private ProductionStatus status;
     private String notes;

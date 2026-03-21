@@ -23,8 +23,4 @@ public class ProductRequest {
     @NotNull(message = "Tipe tidak boleh kosong")
     private ProductType type;
 
-    @NotNull(message = "Harga tidak boleh kosong")
-    private BigDecimal defaultPrice;
-
-    private BigDecimal targetMargin = new BigDecimal("30");
 }

@@ -15,23 +15,12 @@ import AddPaymentModalOrder from '../components/order/addPaymentModalOrder'
 import { formatRupiah, formatDate } from '../utils/format'
 import type { Order, OrderDetail } from '../types/order.types'
 
-interface Product { id: string; name: string; defaultPrice: number }
-
-const statusOptions = [
-  { label: 'Semua Status', value: '' },
-  { label: 'Pending', value: 'PENDING' },
-  { label: 'Process', value: 'PROCESS' },
-  { label: 'Done', value: 'DONE' },
-  { label: 'Delivered', value: 'DELIVERED' },
-  { label: 'Cancelled', value: 'CANCELLED' },
-]
-
-const paymentStatusOptions = [
-  { label: 'Semua Pembayaran', value: '' },
-  { label: 'Belum Bayar', value: 'UNPAID' },
-  { label: 'DP', value: 'DP' },
-  { label: 'Lunas', value: 'PAID' },
-]
+// ← update interface Product — hapus defaultPrice, tambah type
+interface Product {
+  id: string
+  name: string
+  type: string   // MADE_TO_ORDER | MADE_TO_STOCK | RESELL
+}
 
 export default function OrderPage() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -46,9 +35,10 @@ export default function OrderPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterPaymentStatus, setFilterPaymentStatus] = useState('')
+  const [filterStatus, setFilterStatus] = useState('ALL')
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState('ALL')
   const [filterDateRange, setFilterDateRange] = useState<[Date | null, Date | null]>([null, null])
+  const [first, setFirst] = useState(0)
 
   const fetchOrders = async () => {
     const res = await api.get('/orders')
@@ -75,7 +65,10 @@ export default function OrderPage() {
           api.get('/products'),
         ])
         setOrders(ordersRes.data.data)
-        setProducts(productsRes.data.data)
+        // Filter hanya MADE_TO_ORDER & MADE_TO_STOCK — RESELL tidak perlu produksi
+        setProducts(productsRes.data.data.filter(
+          (p: Product) => p.type !== 'RESELL'
+        ))
       } catch (err) {
         console.error(err)
       } finally {
@@ -84,6 +77,10 @@ export default function OrderPage() {
     }
     fetchAll()
   }, [])
+
+  useEffect(() => {
+    setFirst(0)
+  }, [search, filterStatus, filterPaymentStatus, filterDateRange])
 
   const handleDelete = (id: string) => {
     confirmDialog({
@@ -115,18 +112,20 @@ export default function OrderPage() {
     await fetchOrders()
   }
 
-  const hasActiveFilter = !!(search || filterStatus || filterPaymentStatus || filterDateRange[0])
-
   const filteredOrders = orders.filter(o => {
-    const matchSearch = o.customerName.toLowerCase().includes(search.toLowerCase()) ||
+    const matchSearch =
+      o.customerName.toLowerCase().includes(search.toLowerCase()) ||
       o.orderNumber.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = !filterStatus || o.status === filterStatus
-    const matchPayment = !filterPaymentStatus || o.paymentStatus === filterPaymentStatus
+    const matchStatus = filterStatus === 'ALL' || o.status === filterStatus
+    const matchPayment = filterPaymentStatus === 'ALL' || o.paymentStatus === filterPaymentStatus
     const matchDate = (() => {
-      if (!filterDateRange[0]) return true
+      if (!filterDateRange?.[0]) return true
       const orderDate = new Date(o.orderDate)
-      const start = filterDateRange[0]!
-      const end = filterDateRange[1] ?? filterDateRange[0]!
+      orderDate.setHours(0, 0, 0, 0)
+      const start = new Date(filterDateRange[0]!)
+      start.setHours(0, 0, 0, 0)
+      const end = new Date(filterDateRange[1] ?? filterDateRange[0]!)
+      end.setHours(23, 59, 59, 999)
       return orderDate >= start && orderDate <= end
     })()
     return matchSearch && matchStatus && matchPayment && matchDate
@@ -146,7 +145,9 @@ export default function OrderPage() {
     },
     {
       header: 'Tgl Dibutuhkan', body: (row: Order) => (
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{row.requiredDate ? formatDate(row.requiredDate) : '-'}</span>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+          {row.requiredDate ? formatDate(row.requiredDate) : '-'}
+        </span>
       )
     },
     {
@@ -192,24 +193,62 @@ export default function OrderPage() {
       <FilterBar
         config={{
           search: { value: search, onChange: setSearch, placeholder: 'Cari customer atau no. order...' },
-          dateRange: { value: filterDateRange, onChange: setFilterDateRange, placeholder: 'Filter tanggal' },
+          dateRange: {
+            value: filterDateRange,
+            onChange: (val) => setFilterDateRange(val ?? [null, null]),
+            placeholder: 'Filter tanggal'
+          },
           dropdowns: [
-            { value: filterStatus, onChange: setFilterStatus, options: statusOptions, placeholder: 'Status Order' },
-            { value: filterPaymentStatus, onChange: setFilterPaymentStatus, options: paymentStatusOptions, placeholder: 'Status Bayar' },
+            {
+              value: filterStatus,
+              onChange: setFilterStatus,
+              options: [
+                { label: 'Semua Status', value: 'ALL' },
+                { label: 'Pending', value: 'PENDING' },
+                { label: 'Process', value: 'PROCESS' },
+                { label: 'Done', value: 'DONE' },
+                { label: 'Delivered', value: 'DELIVERED' },
+                { label: 'Cancelled', value: 'CANCELLED' },
+              ],
+              placeholder: 'Status Order',
+            },
+            {
+              value: filterPaymentStatus,
+              onChange: setFilterPaymentStatus,
+              options: [
+                { label: 'Semua Pembayaran', value: 'ALL' },
+                { label: 'Belum Bayar', value: 'UNPAID' },
+                { label: 'DP', value: 'DP' },
+                { label: 'Lunas', value: 'PAID' },
+              ],
+              placeholder: 'Status Bayar',
+            },
           ],
         }}
-        onReset={() => { setSearch(''); setFilterStatus(''); setFilterPaymentStatus(''); setFilterDateRange([null, null]) }}
-        hasActiveFilter={hasActiveFilter}
+        onReset={() => {
+          setSearch('')
+          setFilterStatus('ALL')
+          setFilterPaymentStatus('ALL')
+          setFilterDateRange([null, null])
+        }}
+        hasActiveFilter={!!(search || filterStatus !== 'ALL' || filterPaymentStatus !== 'ALL' || filterDateRange[0])}
         onRefresh={fetchOrders}
       />
 
-      <Table data={filteredOrders} columns={columns} loading={loading} emptyMessage="Belum ada order" />
+      <Table
+        data={filteredOrders}
+        columns={columns}
+        loading={loading}
+        emptyMessage="Belum ada order"
+        first={first}
+        onFirstChange={setFirst}
+      />
 
       <CreateModalOrder
         visible={showCreateModal}
         onHide={() => setShowCreateModal(false)}
         onSuccess={fetchOrders}
-        products={products}
+        products={products}   // ← sekarang sudah include type, tanpa defaultPrice
       />
 
       <DetailModalOrder

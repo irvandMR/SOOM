@@ -15,4 +15,7 @@ public class OrderItemRequest {
     private BigDecimal quantity;
 
     private String notes;
+
+    private UUID productionId;
+    private BigDecimal unitPrice;
 }

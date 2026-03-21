@@ -18,7 +18,7 @@ public class CreateProductionRequest {
     private UUID recipeId;
 
     @NotNull(message = "Jumlah produksi tidak boleh kosong")
-    private BigDecimal quantityProduced;
+    private BigDecimal quantityProduced;  // dalam unit produk (toples, pcs, dll)
 
     @NotNull(message = "Tanggal produksi tidak boleh kosong")
     private LocalDate productionDate;
@@ -27,4 +27,6 @@ public class CreateProductionRequest {
 
     @NotNull(message = "Tanggal expired tidak boleh kosong")
     private LocalDateTime expiredDate;
+
+    private BigDecimal actualYield;  // opsional, fallback ke quantityProduced
 }

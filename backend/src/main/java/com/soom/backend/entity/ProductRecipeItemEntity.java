@@ -25,4 +25,8 @@ public class ProductRecipeItemEntity extends BaseEntity{
 
     @Column(nullable = false)
     private BigDecimal quantity;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id", nullable = false)
+    private UnitsEntity units;
 }

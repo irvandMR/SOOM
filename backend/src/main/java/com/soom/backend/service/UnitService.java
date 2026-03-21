@@ -27,6 +27,8 @@ public class UnitService {
                         .id(unit.getId())
                         .name(unit.getName())
                         .symbol(unit.getSymbol())
+                        .conversionFactor(unit.getConversionFactor())
+                        .baseUnit(unit.getBaseUnit())
                         .build())
                 .toList();
     }

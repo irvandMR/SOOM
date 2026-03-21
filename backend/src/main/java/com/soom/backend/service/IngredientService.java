@@ -10,6 +10,7 @@ import com.soom.backend.enums.CashFlowType;
 import com.soom.backend.enums.StockHistoryType;
 import com.soom.backend.repository.*;
 import com.soom.backend.utils.AuthUtil;
+import com.soom.backend.utils.UnitConverter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,8 @@ public class IngredientService {
     private final IngredientStockHistoryRepository ingredientHistoryRepository;
     private final CashFlowRepository cashFlowRepository;
 
+    // ================= GET =================
+
     public List<IngredientResponse> getAll() {
         return ingredientRepository.findByIsDeletedFalse()
                 .stream()
@@ -39,14 +42,17 @@ public class IngredientService {
     }
 
     public IngredientResponse getById(UUID id) {
-        IngredientsEntity ingredient = findById(id);
-        return toResponse(ingredient);
+        return toResponse(findById(id));
     }
 
-    public IngredientResponse create(IngredientRequest request) {
-        IngredientsEntity ingredients = ingredientRepository.findFirstByNameOrderByIdDesc(request.getName());
+    // ================= CREATE =================
 
-        if (ingredients != null && !ingredients.getIsDeleted()) {
+    public IngredientResponse create(IngredientRequest request) {
+
+        IngredientsEntity existing = ingredientRepository
+                .findFirstByNameOrderByIdDesc(request.getName());
+
+        if (existing != null && !existing.getIsDeleted()) {
             throw new RuntimeException("Nama bahan baku sudah ada");
         }
 
@@ -61,6 +67,9 @@ public class IngredientService {
         ingredient.setCategory(category);
         ingredient.setUnit(unit);
         ingredient.setMinimumStock(request.getMinimumStock());
+        ingredient.setStockQuantity(BigDecimal.ZERO);
+        ingredient.setPurchasePrice(BigDecimal.ZERO);
+        ingredient.setAvgPurchasePrice(BigDecimal.ZERO);
         ingredient.setCreatedBy(authUtil.getCurrentUserEmail());
 
         ingredientRepository.save(ingredient);
@@ -68,31 +77,60 @@ public class IngredientService {
         return toResponse(ingredient);
     }
 
+    // ================= UPDATE =================
+
     public IngredientResponse update(UUID id, UpdateIngredientRequest request) {
+
         IngredientsEntity ingredient = findById(id);
 
         CategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Kategori tidak ditemukan"));
 
-
-        UnitsEntity unit = unitRepository.findById(request.getUnitId())
+        UnitsEntity newUnit = unitRepository.findById(request.getUnitId())
                 .orElseThrow(() -> new RuntimeException("Unit tidak ditemukan"));
 
+        UnitsEntity oldUnit = ingredient.getUnit();
+
+        // 🔥 HANDLE CONVERSION (via UTIL)
+        if (!oldUnit.getId().equals(newUnit.getId())) {
+
+            if (!UnitConverter.canConvert(oldUnit.getSymbol(), newUnit.getSymbol())) {
+                throw new RuntimeException("Unit tidak bisa dikonversi");
+            }
+
+            BigDecimal ratio = UnitConverter.getRatio(
+                    oldUnit.getSymbol(),
+                    newUnit.getSymbol()
+            );
+
+            ingredient.setStockQuantity(
+                    ingredient.getStockQuantity().multiply(ratio)
+            );
+
+            ingredient.setMinimumStock(
+                    ingredient.getMinimumStock().multiply(ratio)
+            );
+        }
 
         ingredient.setName(request.getName());
         ingredient.setCategory(category);
-        ingredient.setUnit(unit);
+        ingredient.setUnit(newUnit);
         ingredient.setMinimumStock(request.getMinimumStock());
-        ingredient.setStockQuantity(request.getStockQuantity());
-        ingredient.setPurchasePrice(request.getPurchasePrice());
+
+        // 🔥 last price (dipakai costing)
+        if (request.getPurchasePrice() != null) {
+            ingredient.setPurchasePrice(request.getPurchasePrice());
+        }
+
         ingredient.setUpdatedBy(authUtil.getCurrentUserEmail());
         ingredient.setUpdatedAt(LocalDateTime.now());
 
-        // Simpan
         ingredientRepository.save(ingredient);
 
         return toResponse(ingredient);
     }
+
+    // ================= DELETE =================
 
     public void delete(UUID id) {
         IngredientsEntity ingredient = findById(id);
@@ -100,22 +138,13 @@ public class IngredientService {
         ingredientRepository.save(ingredient);
     }
 
-    // ── HELPER ─────────────────────────────────────────
-
-    private IngredientsEntity findById(UUID id) {
-        IngredientsEntity ingredient = ingredientRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Bahan baku tidak ditemukan"));
-
-        if (ingredient.getIsDeleted()) {
-            throw new RuntimeException("Bahan baku tidak ditemukan");
-        }
-        return ingredient;
-    }
+    // ================= STOCK IN =================
 
     public IngredientResponse stockIn(UUID id, StockInRequest request) {
+
         IngredientsEntity ingredient = findById(id);
 
-        // Simpan history
+        // 🔹 HISTORY
         IngredientStockHistoryEntity history = new IngredientStockHistoryEntity();
         history.setIngredients(ingredient);
         history.setType(StockHistoryType.IN);
@@ -125,36 +154,51 @@ public class IngredientService {
 
         ingredientHistoryRepository.save(history);
 
-        // Update stok & avg price di ingredient
-        BigDecimal oldStock = ingredient.getStockQuantity();
-        BigDecimal newStock = oldStock.add(request.getQuantity());
-
+        // 🔹 CASHFLOW
         CashFlowEntity cashFlow = new CashFlowEntity();
         cashFlow.setType(CashFlowType.OUT);
         cashFlow.setCategory("Pembelian Bahan");
-        cashFlow.setAmount(request.getPurchasePrice()
-                .multiply(request.getQuantity()));
+        cashFlow.setAmount(
+                request.getPurchasePrice().multiply(request.getQuantity())
+        );
         cashFlow.setDescription("Pembelian " + ingredient.getName());
         cashFlow.setTransactionDate(LocalDate.now());
         cashFlow.setReferenceType("INGREDIENT");
         cashFlow.setReferenceId(ingredient.getId());
+
         cashFlowRepository.save(cashFlow);
 
-        // Hitung moving average price
-        BigDecimal oldTotal = oldStock.multiply(ingredient.getAvgPurchasePrice());
-        BigDecimal newTotal = request.getQuantity().multiply(request.getPurchasePrice());
-        BigDecimal newAvgPrice = oldTotal.add(newTotal).divide(newStock, 3, RoundingMode.HALF_UP);
+        // 🔹 STOCK UPDATE
+        BigDecimal oldStock = ingredient.getStockQuantity();
+        BigDecimal newStock = oldStock.add(request.getQuantity());
 
+        // 🔹 AVG PRICE (backup only)
+        BigDecimal newAvgPrice;
+        if (oldStock.compareTo(BigDecimal.ZERO) == 0) {
+            newAvgPrice = request.getPurchasePrice();
+        } else {
+            BigDecimal oldTotal = oldStock.multiply(ingredient.getAvgPurchasePrice());
+            BigDecimal newTotal = request.getQuantity().multiply(request.getPurchasePrice());
+
+            newAvgPrice = oldTotal.add(newTotal)
+                    .divide(newStock, 6, RoundingMode.HALF_UP);
+        }
+
+        // 🔥 FINAL UPDATE
         ingredient.setStockQuantity(newStock);
         ingredient.setAvgPurchasePrice(newAvgPrice);
         ingredient.setPurchasePrice(request.getPurchasePrice());
+
         ingredientRepository.save(ingredient);
 
         return toResponse(ingredient);
     }
 
+    // ================= HISTORY =================
+
     public List<IngredientHistoryResponse> getHistory(UUID id) {
-        findById(id); // validasi ingredient ada
+
+        findById(id);
 
         return ingredientHistoryRepository
                 .findByIngredientsIdAndIsDeletedFalse(id)
@@ -172,6 +216,19 @@ public class IngredientService {
                 .toList();
     }
 
+    // ================= HELPER =================
+
+    private IngredientsEntity findById(UUID id) {
+        IngredientsEntity ingredient = ingredientRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Bahan baku tidak ditemukan"));
+
+        if (ingredient.getIsDeleted()) {
+            throw new RuntimeException("Bahan baku tidak ditemukan");
+        }
+
+        return ingredient;
+    }
+
     private IngredientResponse toResponse(IngredientsEntity ingredient) {
         return IngredientResponse.builder()
                 .id(ingredient.getId())
@@ -181,10 +238,10 @@ public class IngredientService {
                 .unitSymbol(ingredient.getUnit().getSymbol())
                 .stockQuantity(ingredient.getStockQuantity())
                 .minimumStock(ingredient.getMinimumStock())
-                .avgPurchasePrice(ingredient.getAvgPurchasePrice())
+                .avgPurchasePrice(ingredient.getAvgPurchasePrice()) // backup
+                .purchasePrice(ingredient.getPurchasePrice()) // 🔥 dipakai
                 .categoryId(ingredient.getCategory().getId())
                 .unitId(ingredient.getUnit().getId())
-                .purchasePrice(ingredient.getPurchasePrice())
                 .build();
     }
 }

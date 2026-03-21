@@ -14,4 +14,5 @@ public class RecipeItemResponse {
     private String ingredientName;
     private String unitSymbol;
     private BigDecimal quantity;
+    private UUID unitId;
 }

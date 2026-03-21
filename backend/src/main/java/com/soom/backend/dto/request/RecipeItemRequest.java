@@ -14,4 +14,7 @@ public class RecipeItemRequest {
 
     @NotNull(message = "Jumlah tidak boleh kosong")
     private BigDecimal quantity;
+
+    @NotNull(message = "Unit tidak boleh kosong")
+    private UUID unitId;
 }

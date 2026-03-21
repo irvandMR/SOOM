@@ -21,7 +21,7 @@ export default function GlobalToast() {
   return (
     <Toast
       ref={toastRef}
-      position="top-right"
+      position="top-center"
       pt={{
         root: { style: { zIndex: 9999 } },
       }}
