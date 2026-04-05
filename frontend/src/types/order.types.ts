@@ -33,6 +33,7 @@ export interface OrderPayment {
 }
 
 export interface OrderDetail extends Order {
+  tenant: string
   customerAddress: string
   systemNotes: string
   items: OrderItem[]

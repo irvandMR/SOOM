@@ -5,9 +5,12 @@ import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.CashFlowResponse;
 import com.soom.backend.dto.response.CashFlowSummaryResponse;
 import com.soom.backend.dto.response.MonthlyReportResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.service.CashFlowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +24,13 @@ public class CashFlowController {
     private final CashFlowService cashFlowService;
 
     @GetMapping
-    public ResponseEntity<BaseResponse<List<CashFlowResponse>>> getAll() {
-        return ResponseEntity.ok(BaseResponse.<List<CashFlowResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<CashFlowResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "transactionDate", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<CashFlowResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(cashFlowService.getAll())
+                .data(cashFlowService.getAll(pageable, search))
                 .build());
     }
 

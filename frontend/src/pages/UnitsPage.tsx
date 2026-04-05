@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
-import api from '../services/api'
-import { toast } from '../store/useToastStore'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
@@ -9,6 +7,8 @@ import Button from '../components/common/ui/Button'
 import FilterBar from '../components/common/ui/FilterBar'
 import AddModalUnit from '../components/units/addModalUnit'
 import EditModalUnit from '../components/units/editModalUnit'
+import { useUnits, useDeleteUnit, UNIT_KEYS } from '../hooks/queries/useUnitQueries'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface Unit {
   id: string
@@ -17,29 +17,47 @@ interface Unit {
 }
 
 export default function UnitsPage() {
-  const [units, setUnits] = useState<Unit[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'name',
+    sortOrder: 1 as 1 | -1 | 0 | null,
+    search: ''
+  })
+
   const [editUnit, setEditUnit] = useState<Unit | null>(null)
-  const [search, setSearch] = useState('')
-  const [first, setFirst] = useState(0)                    // ← tambah
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
-  const fetchUnits = async () => {
-    const res = await api.get('/units')
-    setUnits(res.data.data)
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: pageData, isLoading } = useUnits({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`
+  })
+
+  const deleteUnit = useDeleteUnit()
+
+  const units = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: UNIT_KEYS.lists() })
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
   }
 
-  useEffect(() => {
-    fetchUnits().finally(() => setLoading(false))
-  }, [])
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
 
-  // Reset ke halaman 1 saat search berubah
-  useEffect(() => {
-    setFirst(0)
-  }, [search])
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     confirmDialog({
       message: 'Unit ini akan dihapus permanen.',
       header: 'Hapus Unit?',
@@ -47,27 +65,14 @@ export default function UnitsPage() {
       acceptClassName: 'p-button-danger',
       acceptLabel: 'Hapus',
       rejectLabel: 'Batal',
-      accept: async () => {
-        try {
-          await api.delete(`/units/${id}`)
-          await fetchUnits()
-          toast.success('Berhasil', 'Unit berhasil dihapus')
-        } catch (err: any) {
-          toast.error('Gagal', err.response?.data?.message ?? 'Gagal menghapus')
-        }
-      },
+      accept: () => deleteUnit.mutate(id),
     })
   }
 
-  const filteredUnits = units.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.symbol.toLowerCase().includes(search.toLowerCase())
-  )
-
   const columns = [
-    { header: 'Nama', field: 'name' },
+    { header: 'Nama', field: 'name', sortable: true },
     {
-      header: 'Simbol', body: (row: Unit) => (
+      header: 'Simbol', field: 'symbol', sortable: true, body: (row: Unit) => (
         <span style={{
           fontSize: 11, padding: '2px 8px', borderRadius: 4,
           background: 'var(--sidebar-bg)', color: 'var(--text)', fontWeight: 600,
@@ -76,8 +81,8 @@ export default function UnitsPage() {
         </span>
       )
     },
-    { header: 'Base Unit', field: 'baseUnit' },
-    { header: 'Conversion', field: 'conversionFactor' },
+    { header: 'Base Unit', field: 'baseUnit', sortable: true },
+    { header: 'Conversion', field: 'conversionFactor', sortable: true },
     {
       header: 'Aksi', body: (row: Unit) => (
         <div style={{ display: 'flex', gap: 6 }}>
@@ -106,7 +111,7 @@ export default function UnitsPage() {
     <div>
       <PageHeader
         title="Units"
-        subtitle={`${filteredUnits.length} unit terdaftar`}
+        subtitle={`${totalRecords} unit terdaftar`}
         actionLabel="Tambah Unit"
         onAction={() => setShowAddModal(true)}
       />
@@ -114,34 +119,40 @@ export default function UnitsPage() {
       <FilterBar
         config={{
           search: {
-            value: search,
-            onChange: setSearch,
+            value: lazyParams.search,
+            onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })),
             placeholder: 'Cari nama atau simbol unit...',
           },
         }}
-        onReset={() => setSearch('')}
-        hasActiveFilter={!!search}
-        onRefresh={fetchUnits}
+        onReset={() => setLazyParams(p => ({ ...p, search: '', page: 0, first: 0 }))}
+        hasActiveFilter={!!lazyParams.search}
+        onRefresh={refresh}
       />
 
       <Table
-        data={filteredUnits}
+        data={units}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         emptyMessage="Belum ada unit"
-        first={first}
-        onFirstChange={setFirst}
+        lazy
+        totalRecords={totalRecords}
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
       />
 
       <AddModalUnit
         visible={showAddModal}
         onHide={() => setShowAddModal(false)}
-        onSuccess={fetchUnits}
+        onSuccess={refresh}
       />
       <EditModalUnit
         visible={showEditModal}
         onHide={() => setShowEditModal(false)}
-        onSuccess={fetchUnits}
+        onSuccess={refresh}
         unit={editUnit}
       />
     </div>

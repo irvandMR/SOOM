@@ -3,9 +3,12 @@ package com.soom.backend.controller;
 import com.soom.backend.dto.request.UnitRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.UnitResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.service.UnitService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,11 +23,13 @@ public class UnitController {
     private final UnitService unitService;
 
     @GetMapping
-    public ResponseEntity<BaseResponse<List<UnitResponse>>> getAll() {
-        return ResponseEntity.ok(BaseResponse.<List<UnitResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<UnitResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "name", direction = org.springframework.data.domain.Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<UnitResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(unitService.getAll())
+                .data(unitService.getAll(pageable, search))
                 .build());
     }
 

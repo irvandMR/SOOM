@@ -6,12 +6,20 @@ import com.soom.backend.dto.request.UpdateOrderStatusRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.OrderDetailResponse;
 import com.soom.backend.dto.response.OrderResponse;
+import com.soom.backend.dto.response.PageResponse;
+import com.soom.backend.service.InvoiceService;
 import com.soom.backend.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,13 +29,18 @@ import java.util.UUID;
 public class OrderController {
 
     private final OrderService orderService;
+    private final InvoiceService invoiceService;
 
     @GetMapping
-    public ResponseEntity<BaseResponse<List<OrderResponse>>> getAll() {
-        return ResponseEntity.ok(BaseResponse.<List<OrderResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<OrderResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "orderDate", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String paymentStatus) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<OrderResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(orderService.getAll())
+                .data(orderService.getAll(pageable, search, status, paymentStatus))
                 .build());
     }
 
@@ -71,5 +84,21 @@ public class OrderController {
                 .message("Pembayaran berhasil ditambahkan")
                 .data(orderService.addPayment(id, request))
                 .build());
+    }
+
+    @GetMapping("/{id}/invoice")
+    public ResponseEntity<byte[]> getInvoice(@PathVariable UUID id) {
+
+        byte[] pdf = invoiceService.generateInvoicePdf(id);
+
+        String fileName = invoiceService.generateFileName(id);
+
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + encodedFileName)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 }

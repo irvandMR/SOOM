@@ -5,6 +5,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -13,6 +16,8 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @NoArgsConstructor
+@SQLDelete(sql = "UPDATE order_payments SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class OrderPaymentEntity extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)

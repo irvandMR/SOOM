@@ -135,6 +135,32 @@
 			<groupId>org.thymeleaf.extras</groupId>
 			<artifactId>thymeleaf-extras-springsecurity6</artifactId>
 		</dependency>
+
+		<!--	Jesper Report	-->
+<!--		<dependency>-->
+<!--			<groupId>net.sf.jasperreports</groupId>-->
+<!--			<artifactId>jasperreports</artifactId>-->
+<!--			<version>6.21.0</version>-->
+<!--			<exclusions>-->
+<!--				&lt;!&ndash; Exclude logging conflict &ndash;&gt;-->
+<!--				<exclusion>-->
+<!--					<groupId>commons-logging</groupId>-->
+<!--					<artifactId>commons-logging</artifactId>-->
+<!--				</exclusion>-->
+<!--			</exclusions>-->
+<!--		</dependency>-->
+
+		<dependency>
+			<groupId>com.openhtmltopdf</groupId>
+			<artifactId>openhtmltopdf-pdfbox</artifactId>
+			<version>1.0.10</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.2.5</version>
+		</dependency>
     </dependencies>
 
 	<build>

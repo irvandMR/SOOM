@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -15,6 +18,8 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
+@SQLDelete(sql = "UPDATE cash_flows SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class CashFlowEntity extends BaseEntity {
 
     @Column(nullable = false)
@@ -38,4 +43,8 @@ public class CashFlowEntity extends BaseEntity {
 
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private TenantEntity tenant;
 }

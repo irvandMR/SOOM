@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -14,6 +17,8 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
+@SQLDelete(sql = "UPDATE ingredients_stock_histories SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class IngredientStockHistoryEntity extends BaseEntity{
 
     @ManyToOne(fetch = FetchType.LAZY)

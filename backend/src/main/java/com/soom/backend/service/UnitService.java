@@ -1,14 +1,16 @@
 package com.soom.backend.service;
 
 import com.soom.backend.dto.request.UnitRequest;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.dto.response.UnitResponse;
 import com.soom.backend.entity.UnitsEntity;
 import com.soom.backend.repository.UnitRepository;
 import com.soom.backend.utils.AuthUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -18,19 +20,10 @@ public class UnitService {
     private final UnitRepository unitRepository;
     private final AuthUtil authUtil;
 
-    // GET ALL
-    public List<UnitResponse> getAll() {
-        return unitRepository.findAll()
-                .stream()
-                .filter(unit -> !unit.getIsDeleted())
-                .map(unit -> UnitResponse.builder()
-                        .id(unit.getId())
-                        .name(unit.getName())
-                        .symbol(unit.getSymbol())
-                        .conversionFactor(unit.getConversionFactor())
-                        .baseUnit(unit.getBaseUnit())
-                        .build())
-                .toList();
+    public PageResponse<UnitResponse> getAll(Pageable pageable, String search) {
+        String searchParam = (search != null && !search.isEmpty()) ? "%" + search.toLowerCase() + "%" : null;
+        Page<UnitsEntity> page = unitRepository.findAllActive(searchParam, pageable);
+        return PageResponse.of(page.map(this::toResponse));
     }
 
     // GET BY ID
@@ -42,11 +35,7 @@ public class UnitService {
             throw new RuntimeException("Unit tidak ditemukan");
         }
 
-        return UnitResponse.builder()
-                .id(unit.getId())
-                .name(unit.getName())
-                .symbol(unit.getSymbol())
-                .build();
+        return toResponse(unit);
     }
 
     // CREATE
@@ -62,11 +51,7 @@ public class UnitService {
 
         unitRepository.save(unit);
 
-        return UnitResponse.builder()
-                .id(unit.getId())
-                .name(unit.getName())
-                .symbol(unit.getSymbol())
-                .build();
+        return toResponse(unit);
     }
 
     // UPDATE
@@ -84,11 +69,7 @@ public class UnitService {
 
         unitRepository.save(unit);
 
-        return UnitResponse.builder()
-                .id(unit.getId())
-                .name(unit.getName())
-                .symbol(unit.getSymbol())
-                .build();
+        return toResponse(unit);
     }
 
     // DELETE (soft delete)
@@ -99,5 +80,15 @@ public class UnitService {
         unit.setIsDeleted(true);
         unit.setUpdatedBy(authUtil.getCurrentUserEmail());
         unitRepository.save(unit);
+    }
+
+    private UnitResponse toResponse(UnitsEntity unit) {
+        return UnitResponse.builder()
+                .id(unit.getId())
+                .name(unit.getName())
+                .symbol(unit.getSymbol())
+                .conversionFactor(unit.getConversionFactor())
+                .baseUnit(unit.getBaseUnit())
+                .build();
     }
 }

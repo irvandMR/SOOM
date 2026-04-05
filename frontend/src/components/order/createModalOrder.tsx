@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { InputText } from 'primereact/inputtext'
 import { Dropdown } from 'primereact/dropdown'
 import { InputNumber } from 'primereact/inputnumber'
@@ -128,6 +128,13 @@ export default function CreateModalOrder({ visible, onHide, onSuccess, products 
   const totalAmount = form.items.reduce((sum, _, i) => {
     return sum + getUnitPrice(i) * (form.items[i].quantity ?? 0)
   }, 0)
+
+  // Auto-fill initial payment if Lunas (SETTLEMENT)
+  useEffect(() => {
+    if (form.paymentType === 'SETTLEMENT') {
+      setForm(prev => ({ ...prev, initialPayment: totalAmount }))
+    }
+  }, [form.paymentType, totalAmount])
 
   const handleSave = async () => {
     const result = orderSchema.safeParse(form)
@@ -279,8 +286,8 @@ export default function CreateModalOrder({ visible, onHide, onSuccess, products 
                     }))}
                     placeholder={
                       !item.productId ? 'Pilih produk dulu' :
-                      availableProductions.length === 0 ? 'Tidak ada produksi tersedia' :
-                      'Pilih produksi'
+                        availableProductions.length === 0 ? 'Tidak ada produksi tersedia' :
+                          'Pilih produksi'
                     }
                     disabled={!item.productId || availableProductions.length === 0}
                     className={`w-full ${errors[`items.${i}.productionId`] ? 'p-invalid' : ''}`}

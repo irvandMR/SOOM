@@ -1,5 +1,6 @@
 package com.soom.backend.service;
 
+import com.soom.backend.context.TenantContext;
 import com.soom.backend.dto.request.AddPaymentRequest;
 import com.soom.backend.dto.request.CreateOrderRequest;
 import com.soom.backend.dto.request.OrderItemRequest;
@@ -9,14 +10,16 @@ import com.soom.backend.entity.*;
 import com.soom.backend.enums.*;
 import com.soom.backend.exception.ResourceNotFoundException;
 import com.soom.backend.repository.*;
-import com.soom.backend.util.UnitConversionHelper;
 import com.soom.backend.utils.OrderNumberGenerator;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -36,12 +39,29 @@ public class OrderService {
     private final IngredientStockHistoryRepository stockHistoryRepository;
     private final OrderNumberGenerator orderNumberGenerator;
     private final CashFlowRepository cashFlowRepository;
+    private final TenantRepository tenantRepository;
 
-    public List<OrderResponse> getAll() {
-        return orderRepository.findByIsDeletedFalseOrderByOrderDateDesc()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public PageResponse<OrderResponse> getAll(
+            Pageable pageable, 
+            String search,
+            String statusStr,
+            String paymentStatusStr) {
+        
+        UUID tenantId = TenantContext.getTenantId();
+        
+        OrderStatus status = null;
+        if (statusStr != null && !statusStr.equals("ALL")) {
+            try { status = OrderStatus.valueOf(statusStr); } catch (Exception ignored) {}
+        }
+
+        PaymentStatus paymentStatus = null;
+        if (paymentStatusStr != null && !paymentStatusStr.equals("ALL")) {
+            try { paymentStatus = PaymentStatus.valueOf(paymentStatusStr); } catch (Exception ignored) {}
+        }
+
+        String searchParam = (search != null && !search.isEmpty()) ? "%" + search.toLowerCase() + "%" : null;
+        Page<OrderEntity> page = orderRepository.findAllActive(tenantId, searchParam, status, paymentStatus, pageable);
+        return PageResponse.of(page.map(this::toResponse));
     }
 
     public OrderDetailResponse getById(UUID id) {
@@ -53,6 +73,9 @@ public class OrderService {
 
     @Transactional
     public OrderDetailResponse create(CreateOrderRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+        TenantEntity tenant = tenantRepository.getReferenceById(tenantId);
+
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<OrderItemEntity> items = new ArrayList<>();
         StringBuilder systemNotes = new StringBuilder();
@@ -101,28 +124,19 @@ public class OrderService {
             item.setNotes(itemRequest.getNotes());
             items.add(item);
 
-            // Kurangi availableQty produksi untuk MADE_TO_STOCK
-            if (product.getType() == ProductType.MADE_TO_STOCK) {
-                production.setAvailableQty(available.subtract(itemRequest.getQuantity()));
-                productionRepository.save(production);
+            // Update stok produk & produksi untuk SEMUA tipe produk
+            BigDecimal itemQty = itemRequest.getQuantity();
+            production.setAvailableQty(available.subtract(itemQty));
+            productionRepository.save(production);
 
-                // Kurangi stok produk
-                product.setStockQuantity(
-                        product.getStockQuantity().subtract(itemRequest.getQuantity())
-                );
-                productRepository.save(product);
-            }
-
-            // Untuk MADE_TO_ORDER — availableQty dikurangi tapi stok bahan belum berkurang
-            // Stok bahan berkurang saat status order = DONE
-            if (product.getType() == ProductType.MADE_TO_ORDER) {
-                production.setAvailableQty(available.subtract(itemRequest.getQuantity()));
-                productionRepository.save(production);
-            }
+            // Kurangi stok produk utama agar sinkron dengan daftar inventory
+            product.setStockQuantity(product.getStockQuantity().subtract(itemQty));
+            productRepository.save(product);
         }
 
         // Buat order
         OrderEntity order = new OrderEntity();
+        order.setTenant(tenant);
         order.setOrderNumber(orderNumberGenerator.generate());
         order.setCustomerName(request.getCustomerName());
         order.setCustomerPhone(request.getCustomerPhone());
@@ -164,6 +178,7 @@ public class OrderService {
 
             // Cash flow
             CashFlowEntity cashFlow = new CashFlowEntity();
+            cashFlow.setTenant(tenant);
             cashFlow.setType(CashFlowType.IN);
             cashFlow.setCategory("Penjualan");
             cashFlow.setAmount(request.getInitialPayment());
@@ -184,48 +199,41 @@ public class OrderService {
         order.setStatus(request.getStatus());
         orderRepository.save(order);
 
-        // Saat order DONE → kurangi stok bahan untuk MADE_TO_ORDER
+        // Saat order DONE → kurangi stok bahan untuk MADE_TO_ORDER & Catat COGS
         if (request.getStatus() == OrderStatus.DONE && oldStatus != OrderStatus.DONE) {
             List<OrderItemEntity> items = orderItemRepository.findByOrderIdAndIsDeletedFalse(id);
+            BigDecimal totalOrderCogs = BigDecimal.ZERO;
 
             for (OrderItemEntity item : items) {
                 ProductEntity product = item.getProduct();
-
-                if (product.getType() != ProductType.MADE_TO_ORDER) continue;
                 if (item.getProduction() == null) continue;
 
-                // Ambil resep dari produksi
-                ProductRecipesEntity recipe = item.getProduction().getRecipes();
-                List<ProductRecipeItemEntity> recipeItems =
-                        recipeItemRepository.findByRecipesIdAndIsDeletedFalse(recipe.getId());
+                // Snapshot COGS dari produksi
+                BigDecimal unitCogs = item.getProduction().getActualCostPerUnit();
+                BigDecimal itemTotalCogs = item.getQuantity().multiply(unitCogs);
+                
+                item.setCogsPerUnit(unitCogs);
+                item.setTotalCogs(itemTotalCogs);
+                orderItemRepository.save(item);
+                
+                totalOrderCogs = totalOrderCogs.add(itemTotalCogs);
 
-                // Hitung jumlah bahan yang dibutuhkan
-                // qty order / estimatedYield = berapa batch
-                // lalu batch x qty bahan per batch
-                BigDecimal estimatedYield = recipe.getEstimatedYield();
-                if (estimatedYield == null || estimatedYield.compareTo(BigDecimal.ZERO) == 0) continue;
+                // Logic Pengurangan Stok Bahan Ganda sudah dihapus. 
+                // Bahan baku kini hanya dipotong di modul PRODUKSI.
+            }
 
-                BigDecimal batchNeeded = item.getQuantity()
-                        .divide(estimatedYield, 4, RoundingMode.HALF_UP);
-
-                for (ProductRecipeItemEntity recipeItem : recipeItems) {
-                    IngredientsEntity ingredient = recipeItem.getIngredients();
-                    BigDecimal needed = recipeItem.getQuantity().multiply(batchNeeded);
-
-                    ingredient.setStockQuantity(
-                            ingredient.getStockQuantity().subtract(needed)
-                    );
-                    ingredientRepository.save(ingredient);
-
-                    // Catat history stok keluar
-                    IngredientStockHistoryEntity stockHistory = new IngredientStockHistoryEntity();
-                    stockHistory.setIngredients(ingredient);
-                    stockHistory.setType(StockHistoryType.OUT);
-                    stockHistory.setQuantity(needed);
-                    stockHistory.setNotes("Order selesai: " + order.getOrderNumber());
-                    stockHistory.setReferenceType("ORDER");
-                    stockHistoryRepository.save(stockHistory);
-                }
+            // Catat CashFlow OUT untuk HPP (COGS)
+            if (totalOrderCogs.compareTo(BigDecimal.ZERO) > 0) {
+                CashFlowEntity hppFlow = new CashFlowEntity();
+                hppFlow.setTenant(order.getTenant());
+                hppFlow.setType(CashFlowType.OUT);
+                hppFlow.setCategory("HPP");
+                hppFlow.setAmount(totalOrderCogs);
+                hppFlow.setDescription("HPP Order " + order.getOrderNumber());
+                hppFlow.setTransactionDate(LocalDate.now());
+                hppFlow.setReferenceType("ORDER_HPP");
+                hppFlow.setReferenceId(order.getId());
+                cashFlowRepository.save(hppFlow);
             }
         }
 
@@ -234,22 +242,24 @@ public class OrderService {
             List<OrderItemEntity> items = orderItemRepository.findByOrderIdAndIsDeletedFalse(id);
 
             for (OrderItemEntity item : items) {
-                if (item.getProduction() == null) continue;
+                try {
+                    if (item.getProduction() != null) {
+                        ProductionEntity production = item.getProduction();
+                        BigDecimal currentAvailable = production.getAvailableQty() != null
+                                ? production.getAvailableQty() : BigDecimal.ZERO;
 
-                ProductionEntity production = item.getProduction();
-                BigDecimal currentAvailable = production.getAvailableQty() != null
-                        ? production.getAvailableQty() : BigDecimal.ZERO;
+                        production.setAvailableQty(currentAvailable.add(item.getQuantity()));
+                        productionRepository.save(production);
+                    }
 
-                production.setAvailableQty(currentAvailable.add(item.getQuantity()));
-                productionRepository.save(production);
-
-                // Kembalikan stok produk untuk MADE_TO_STOCK
-                if (item.getProduct().getType() == ProductType.MADE_TO_STOCK) {
-                    ProductEntity product = item.getProduct();
-                    product.setStockQuantity(
-                            product.getStockQuantity().add(item.getQuantity())
-                    );
-                    productRepository.save(product);
+                    // Kembalikan stok produk untuk MADE_TO_STOCK
+                    if (item.getProduct() != null && item.getProduct().getType() == ProductType.MADE_TO_STOCK) {
+                        ProductEntity product = item.getProduct();
+                        product.setStockQuantity(product.getStockQuantity().add(item.getQuantity()));
+                        productRepository.save(product);
+                    }
+                } catch (Exception e) {
+                    // Ignore orphaned references (e.g. hard deleted products) during order cancellation
                 }
             }
         }
@@ -270,6 +280,7 @@ public class OrderService {
         orderPaymentRepository.save(payment);
 
         CashFlowEntity cashFlow = new CashFlowEntity();
+        cashFlow.setTenant(order.getTenant());
         cashFlow.setType(CashFlowType.IN);
         cashFlow.setCategory("Penjualan");
         cashFlow.setAmount(request.getAmount());
@@ -296,8 +307,8 @@ public class OrderService {
 
     private BigDecimal calculateRecommendedPrice(ProductionEntity production) {
         List<ProductRecipeItemEntity> items =
-                recipeItemRepository.findByRecipesIdAndIsDeletedFalse(
-                        production.getRecipes().getId()
+                recipeItemRepository.findByRecipesIdAndTenantIdAndIsDeletedFalse(
+                        production.getRecipes().getId(), TenantContext.getTenantId()
                 );
 
         BigDecimal totalCostPerBatch = items.stream()
@@ -324,6 +335,10 @@ public class OrderService {
         OrderEntity order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order tidak ditemukan"));
         if (order.getIsDeleted()) {
+            throw new ResourceNotFoundException("Order tidak ditemukan");
+        }
+        UUID tenantId = TenantContext.getTenantId();
+        if (tenantId != null && !order.getTenant().getId().equals(tenantId)) {
             throw new ResourceNotFoundException("Order tidak ditemukan");
         }
         return order;
@@ -364,6 +379,7 @@ public class OrderService {
                 .paymentStatus(order.getPaymentStatus().name())
                 .notes(order.getNotes())
                 .systemNotes(order.getSystemNotes())
+                .tenant(order.getTenant().getBusinessName())
                 .items(items.stream()
                         .map(item -> OrderItemResponse.builder()
                                 .id(item.getId())

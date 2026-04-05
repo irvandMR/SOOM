@@ -1,8 +1,10 @@
-import { Plus } from 'lucide-react'
+import { Plus, Download } from 'lucide-react'
 import Modal from '../common/ui/Modal'
 import StatusBadge from '../common/ui/StatusBadge'
 import Button from '../common/ui/Button'
 import { formatRupiah, formatDate } from '../../utils/format'
+import api from '../../services/api'
+import { toast } from '../../store/useToastStore'
 import type { OrderDetail } from '../../types/order.types'
 
 interface Props {
@@ -17,6 +19,28 @@ interface Props {
 export default function DetailModalOrder({ visible, onHide, order, loading, onUpdateStatus, onAddPayment }: Props) {
   const sisaBayar = order ? order.totalAmount - order.paidAmount : 0
   const isDelivered = order?.status === 'DELIVERED'
+
+  const handleDownloadInvoice = async () => {
+    if (!order) return
+    try {
+      const response = await api.get(`/orders/${order.id}/invoice`, {
+        responseType: 'blob',
+      })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      const dateFormatted = new Date(order.orderDate).toISOString().split('T')[0] // Format YYYY-MM-DD
+      link.setAttribute('download', `${order.orderNumber}-${order.tenant}-${dateFormatted}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Berhasil', 'Invoice berhasil didownload')
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Gagal', 'Gagal mendownload invoice')
+    }
+  }
 
   return (
     <Modal
@@ -49,6 +73,13 @@ export default function DetailModalOrder({ visible, onHide, order, loading, onUp
               {order.paymentStatus !== 'PAID' && (
                 <Button label="Tambah Bayar" icon={<Plus size={12} />} size="small" onClick={onAddPayment} />
               )}
+              <Button
+                label="Download Invoice"
+                icon={<Download size={12} />}
+                variant="secondary"
+                size="small"
+                onClick={handleDownloadInvoice}
+              />
             </div>
           </div>
 

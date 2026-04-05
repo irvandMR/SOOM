@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
-import api from '../services/api'
-import { toast } from '../store/useToastStore'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
@@ -9,6 +7,8 @@ import Button from '../components/common/ui/Button'
 import FilterBar from '../components/common/ui/FilterBar'
 import AddModalUserManagement from '../components/user/addModalUserManagement'
 import EditModalUserManagement from '../components/user/editModalUserManagement'
+import { useUsers, useDeleteUser, USER_KEYS } from '../hooks/queries/useUserQueries'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface User {
   id: string
@@ -19,31 +19,49 @@ interface User {
 }
 
 export default function UserManagementPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'name',
+    sortOrder: 1 as 1 | -1 | 0 | null,
+    search: '',
+    filterRole: 'ALL',
+    filterActive: 'ALL'
+  })
+
   const [editUser, setEditUser] = useState<User | null>(null)
-  const [search, setSearch] = useState('')
-  const [filterRole, setFilterRole] = useState('ALL')
-  const [filterActive, setFilterActive] = useState('ALL')
-  const [first, setFirst] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
-  const fetchUsers = async () => {
-    const res = await api.get('/users')
-    setUsers(res.data.data)
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: pageData, isLoading } = useUsers({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`
+  })
+
+  const deleteUser = useDeleteUser()
+
+  const users = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: USER_KEYS.lists() })
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
   }
 
-  useEffect(() => {
-    fetchUsers().finally(() => setLoading(false))
-  }, [])
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
 
-  // Reset ke halaman 1 saat filter berubah
-  useEffect(() => {
-    setFirst(0)
-  }, [search, filterRole, filterActive])
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     confirmDialog({
       message: 'User ini akan dihapus permanen.',
       header: 'Hapus User?',
@@ -51,30 +69,15 @@ export default function UserManagementPage() {
       acceptClassName: 'p-button-danger',
       acceptLabel: 'Hapus',
       rejectLabel: 'Batal',
-      accept: async () => {
-        try {
-          await api.delete(`/users/${id}`)
-          await fetchUsers()
-          toast.success('Berhasil', 'User berhasil dihapus')
-        } catch (err: any) {
-          toast.error('Gagal', err.response?.data?.message ?? 'Gagal menghapus')
-        }
-      },
+      accept: () => deleteUser.mutate(id),
     })
   }
 
-  const filteredUsers = users.filter(u => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase())
-    const matchRole = filterRole === 'ALL' || u.role === filterRole
-    const matchActive = filterActive === 'ALL' || u.active === (filterActive === 'true')
-    return matchSearch && matchRole && matchActive
-  })
-
   const columns = [
-    { header: 'Nama', field: 'name' },
-    { header: 'Email', field: 'email' },
+    { header: 'Nama', field: 'name', sortable: true },
+    { header: 'Email', field: 'email', sortable: true },
     {
-      header: 'Role', body: (row: User) => (
+      header: 'Role', field: 'role', sortable: true, body: (row: User) => (
         <span style={{
           fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
           background: row.role === 'admin' ? '#FFF3E0' : '#E3F2FB',
@@ -85,13 +88,13 @@ export default function UserManagementPage() {
       )
     },
     {
-      header: 'Status', body: (row: User) => (
+      header: 'Status', field: 'isActive', sortable: true, body: (row: any) => (
         <span style={{
           fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-          background: row.active ? '#E8F5E9' : '#FFEBEE',
-          color: row.active ? '#2E7D32' : '#C62828',
+          background: row.isActive ? '#E8F5E9' : '#FFEBEE',
+          color: row.isActive ? '#2E7D32' : '#C62828',
         }}>
-          {row.active ? 'Aktif' : 'Tidak Aktif'}
+          {row.isActive ? 'Aktif' : 'Tidak Aktif'}
         </span>
       )
     },
@@ -125,18 +128,22 @@ export default function UserManagementPage() {
     <div>
       <PageHeader
         title="User Management"
-        subtitle={`${filteredUsers.length} user terdaftar`}
+        subtitle={`${totalRecords} user terdaftar`}
         actionLabel="Tambah User"
         onAction={() => setShowAddModal(true)}
       />
 
       <FilterBar
         config={{
-          search: { value: search, onChange: setSearch, placeholder: 'Cari nama user...' },
+          search: { 
+            value: lazyParams.search, 
+            onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })), 
+            placeholder: 'Cari nama user...' 
+          },
           dropdowns: [
             {
-              value: filterRole,
-              onChange: setFilterRole,
+              value: lazyParams.filterRole,
+              onChange: (v) => setLazyParams(p => ({ ...p, filterRole: v, page: 0, first: 0 })),
               options: [
                 { label: 'Semua Role', value: 'ALL' },
                 { label: 'Admin', value: 'admin' },
@@ -145,8 +152,8 @@ export default function UserManagementPage() {
               placeholder: 'Role',
             },
             {
-              value: filterActive,
-              onChange: setFilterActive,
+              value: lazyParams.filterActive,
+              onChange: (v) => setLazyParams(p => ({ ...p, filterActive: v, page: 0, first: 0 })),
               options: [
                 { label: 'Semua Status', value: 'ALL' },
                 { label: 'Aktif', value: 'true' },
@@ -156,30 +163,36 @@ export default function UserManagementPage() {
             },
           ],
         }}
-        onReset={() => { setSearch(''); setFilterRole('ALL'); setFilterActive('ALL') }}
-        hasActiveFilter={!!(search || filterRole !== 'ALL' || filterActive !== 'ALL')}
-        onRefresh={fetchUsers}
+        onReset={() => setLazyParams(p => ({ ...p, search: '', filterRole: 'ALL', filterActive: 'ALL', page: 0, first: 0 }))}
+        hasActiveFilter={!!(lazyParams.search || lazyParams.filterRole !== 'ALL' || lazyParams.filterActive !== 'ALL')}
+        onRefresh={refresh}
       />
 
       <Table
-        data={filteredUsers}
+        data={users}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         emptyMessage="Belum ada user"
-        first={first}
-        onFirstChange={setFirst}
+        lazy
+        totalRecords={totalRecords}
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
       />
 
       <AddModalUserManagement
         visible={showAddModal}
         onHide={() => setShowAddModal(false)}
-        onSuccess={fetchUsers}
+        onSuccess={refresh}
       />
 
       <EditModalUserManagement
         visible={showEditModal}
         onHide={() => setShowEditModal(false)}
-        onSuccess={fetchUsers}
+        onSuccess={refresh}
         user={editUser}
       />
     </div>

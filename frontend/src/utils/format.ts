@@ -1,9 +1,11 @@
-export const formatRupiah = (amount: number): string =>
-  new Intl.NumberFormat('id-ID', {
+export const formatRupiah = (amount: number | null | undefined): string => {
+  const safeAmount = (amount == null || isNaN(amount)) ? 0 : amount;
+  return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
-  }).format(amount)
+  }).format(safeAmount);
+}
 
 export const formatDate = (date: string): string => {
   if (!date) return '-'

@@ -2,11 +2,14 @@ package com.soom.backend.controller;
 
 import com.soom.backend.dto.request.CreateProductionRequest;
 import com.soom.backend.dto.response.BaseResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.dto.response.ProductionDetailResponse;
 import com.soom.backend.dto.response.ProductionResponse;
 import com.soom.backend.service.ProductionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +24,13 @@ public class ProductionController {
     private final ProductionService productionService;
 
     @GetMapping
-    public ResponseEntity<BaseResponse<List<ProductionResponse>>> getAll() {
-        return ResponseEntity.ok(BaseResponse.<List<ProductionResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<ProductionResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "productionDate", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<ProductionResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(productionService.getAll())
+                .data(productionService.getAll(pageable, search))
                 .build());
     }
 

@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,6 +18,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
+@SQLDelete(sql = "UPDATE productions SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class ProductionEntity extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -46,5 +51,16 @@ public class ProductionEntity extends BaseEntity {
 
     @Column(name = "available_qty")
     private BigDecimal availableQty;  // dalam unit produk
+
+    // ── COGS Snapshot (disimpan saat produksi, tidak berubah) ──────────────────
+    @Column(name = "actual_cost_per_unit", nullable = false)
+    private BigDecimal actualCostPerUnit = BigDecimal.ZERO;
+
+    @Column(name = "total_actual_cost", nullable = false)
+    private BigDecimal totalActualCost = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id")
+    private TenantEntity tenant;
 
 }

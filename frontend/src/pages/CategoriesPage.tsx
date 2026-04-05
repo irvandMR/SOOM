@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
-import api from '../services/api'
-import { toast } from '../store/useToastStore'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
@@ -9,6 +7,12 @@ import Button from '../components/common/ui/Button'
 import FilterBar from '../components/common/ui/FilterBar'
 import AddModalCategory from '../components/categories/addModalCategory'
 import EditModalCategory from '../components/categories/editModalCategory'
+import {
+  useCategories,
+  useDeleteCategory,
+  CATEGORY_KEYS,
+} from '../hooks/queries/useCategoryQueries'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface Category {
   id: string
@@ -17,29 +21,48 @@ interface Category {
 }
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'name',
+    sortOrder: 1 as 1 | -1 | 0 | null,
+    search: '',
+    filterType: 'ALL'
+  })
+
   const [editCategory, setEditCategory] = useState<Category | null>(null)
-  const [search, setSearch] = useState('')
-  const [filterType, setFilterType] = useState('ALL')
-  const [first, setFirst] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
-  const fetchCategories = async () => {
-    const res = await api.get('/categories')
-    setCategories(res.data.data)
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: pageData, isLoading } = useCategories({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`
+  })
+
+  const deleteCategory = useDeleteCategory()
+
+  const categories = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
   }
 
-  useEffect(() => {
-    fetchCategories().finally(() => setLoading(false))
-  }, [])
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
 
-  useEffect(() => {
-    setFirst(0)
-  }, [search, filterType])
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     confirmDialog({
       message: 'Kategori ini akan dihapus permanen.',
       header: 'Hapus Kategori?',
@@ -47,28 +70,14 @@ export default function CategoriesPage() {
       acceptClassName: 'p-button-danger',
       acceptLabel: 'Hapus',
       rejectLabel: 'Batal',
-      accept: async () => {
-        try {
-          await api.delete(`/categories/${id}`)
-          await fetchCategories()
-          toast.success('Berhasil', 'Kategori berhasil dihapus')
-        } catch (err: any) {
-          toast.error('Gagal', err.response?.data?.message ?? 'Gagal menghapus')
-        }
-      },
+      accept: () => deleteCategory.mutate(id),
     })
   }
 
-  const filteredCategories = categories.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase())
-    const matchType = filterType === 'ALL' || c.type === filterType
-    return matchSearch && matchType
-  })
-
   const columns = [
-    { header: 'Nama', field: 'name' },
+    { header: 'Nama', field: 'name', sortable: true },
     {
-      header: 'Tipe', body: (row: Category) => (
+      header: 'Tipe', field: 'type', sortable: true, body: (row: Category) => (
         <span style={{
           fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
           background: row.type === 'INGREDIENT' ? '#E8F5E9' : '#E3F2FB',
@@ -106,17 +115,21 @@ export default function CategoriesPage() {
     <div>
       <PageHeader
         title="Kategori"
-        subtitle={`${filteredCategories.length} kategori terdaftar`}
+        subtitle={`${totalRecords} kategori terdaftar`}
         actionLabel="Tambah Kategori"
         onAction={() => setShowAddModal(true)}
       />
 
       <FilterBar
         config={{
-          search: { value: search, onChange: setSearch, placeholder: 'Cari nama kategori...' },
+          search: { 
+            value: lazyParams.search, 
+            onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })), 
+            placeholder: 'Cari nama kategori...' 
+          },
           dropdowns: [{
-            value: filterType,
-            onChange: setFilterType,
+            value: lazyParams.filterType,
+            onChange: (v) => setLazyParams(p => ({ ...p, filterType: v, page: 0, first: 0 })),
             options: [
               { label: 'Semua Tipe', value: 'ALL' },
               { label: 'Ingredient', value: 'INGREDIENT' },
@@ -125,30 +138,36 @@ export default function CategoriesPage() {
             placeholder: 'Tipe',
           }],
         }}
-        onReset={() => { setSearch(''); setFilterType('ALL') }}
-        hasActiveFilter={!!(search || filterType !== 'ALL')}
-        onRefresh={fetchCategories}
+        onReset={() => setLazyParams(p => ({ ...p, search: '', filterType: 'ALL', page: 0, first: 0 }))}
+        hasActiveFilter={!!(lazyParams.search || lazyParams.filterType !== 'ALL')}
+        onRefresh={refresh}
       />
 
       <Table
-        data={filteredCategories}
+        data={categories}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         emptyMessage="Belum ada kategori"
-        first={first}
-        onFirstChange={setFirst}
+        lazy
+        totalRecords={totalRecords}
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
       />
 
       <AddModalCategory
         visible={showAddModal}
         onHide={() => setShowAddModal(false)}
-        onSuccess={fetchCategories}
+        onSuccess={refresh}
       />
 
       <EditModalCategory
         visible={showEditModal}
         onHide={() => setShowEditModal(false)}
-        onSuccess={fetchCategories}
+        onSuccess={refresh}
         category={editCategory}
       />
     </div>

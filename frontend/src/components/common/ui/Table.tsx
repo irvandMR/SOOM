@@ -10,12 +10,20 @@ interface TableProps {
     header: string
     body?: (row: any) => React.ReactNode
     style?: React.CSSProperties
+    sortable?: boolean
   }[]
   loading?: boolean
   emptyMessage?: string
   rows?: number
   first?: number
+  totalRecords?: number
+  lazy?: boolean
+  onPage?: (event: any) => void
+  onSort?: (event: any) => void
+  onFilter?: (event: any) => void
   onFirstChange?: (val: number) => void
+  sortField?: string
+  sortOrder?: 1 | -1 | 0 | null
 }
 
 export default function Table({
@@ -26,6 +34,13 @@ export default function Table({
   rows: externalRows,
   first: externalFirst,
   onFirstChange,
+  totalRecords,
+  lazy,
+  onPage,
+  onSort,
+  onFilter,
+  sortField,
+  sortOrder,
 }: TableProps) {
   const [internalFirst, setInternalFirst] = useState(0)
   const [internalRows, setInternalRows] = useState(10)
@@ -34,8 +49,10 @@ export default function Table({
   const setFirst = onFirstChange ?? setInternalFirst
   const rows = externalRows ?? internalRows
 
-  const safeFirst = first > data.length ? 0 : first
-  const pagedData = data.slice(safeFirst, safeFirst + rows)
+  // Client-side pagination logic (only if not lazy)
+  const safeFirst = !lazy && first > data.length ? 0 : first
+  const displayData = lazy ? data : data.slice(safeFirst, safeFirst + rows)
+  const total = lazy ? (totalRecords ?? 0) : data.length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -43,13 +60,23 @@ export default function Table({
       {/* Pagination kanan atas */}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Pagination
-          total={data.length}
+          total={total}
           rows={rows}
           first={safeFirst}
-          onPageChange={setFirst}
+          onPageChange={(newFirst) => {
+            if (lazy && onPage) {
+              onPage({ first: newFirst, rows })
+            } else {
+              setFirst(newFirst)
+            }
+          }}
           onRowsChange={(newRows) => {
-            setInternalRows(newRows)
-            setFirst(0)
+            if (lazy && onPage) {
+              onPage({ first: 0, rows: newRows })
+            } else {
+              setInternalRows(newRows)
+              setFirst(0)
+            }
           }}
         />
       </div>
@@ -57,10 +84,19 @@ export default function Table({
       {/* Table box */}
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
         <DataTable
-          value={pagedData}
+          value={displayData}
           loading={loading}
           emptyMessage={emptyMessage}
           style={{ fontFamily: 'inherit', fontSize: 13 }}
+          lazy={lazy}
+          totalRecords={total}
+          first={safeFirst}
+          rows={rows}
+          onPage={onPage}
+          onSort={onSort}
+          onFilter={onFilter}
+          sortField={sortField}
+          sortOrder={sortOrder}
           pt={{
             thead: { style: { background: 'var(--sidebar-bg)' } },
             column: {
@@ -71,11 +107,18 @@ export default function Table({
           }}
         >
           {columns.map((col, i) => (
-            <Column key={i} field={col.field} header={col.header} body={col.body} style={col.style} />
+            <Column 
+              key={i} 
+              field={col.field} 
+              header={col.header} 
+              body={col.body} 
+              style={col.style} 
+              sortable={col.sortable} 
+            />
           ))}
         </DataTable>
       </div>
 
     </div>
   )
-}
+}

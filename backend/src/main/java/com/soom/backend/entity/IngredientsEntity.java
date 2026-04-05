@@ -5,6 +5,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.math.BigDecimal;
 
 @Entity
@@ -12,6 +15,8 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 @NoArgsConstructor
+@SQLDelete(sql = "UPDATE ingredients SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class IngredientsEntity extends BaseEntity{
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -36,4 +41,8 @@ public class IngredientsEntity extends BaseEntity{
 
     @Column(name = "purchase_price")
     private BigDecimal purchasePrice = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private TenantEntity tenant;
 }

@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Wallet, FileSpreadsheet, FileText, Plus } from 'lucide-react'
-import api from '../services/api'
-import type { CashFlow, CashFlowSummary, MonthlyReport } from '../types/cashflow.types'
+import { useState } from 'react'
+import { TrendingUp, TrendingDown, Wallet, FileSpreadsheet, Plus, Calendar } from 'lucide-react'
+import type { CashFlow } from '../types/cashflow.types'
 import { formatRupiah, formatDate } from '../utils/format'
 import Table from '../components/common/ui/Table'
 import StatusBadge from '../components/common/ui/StatusBadge'
 import FilterBar from '../components/common/ui/FilterBar'
 import Button from '../components/common/ui/Button'
-import { toast } from '../store/useToastStore'
 import CreateManualCashFlow from '../components/cashflow/createManualCashFlow'
+import {
+  useCashFlows,
+  useCashFlowSummary,
+  useMonthlyCashFlow,
+  useDownloadMonthlyReport,
+  useProfitLoss,
+  CASHFLOW_KEYS,
+} from '../hooks/queries/useCashFlowQueries'
+import { useQueryClient } from '@tanstack/react-query'
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
@@ -18,104 +25,88 @@ const yearOptions = Array.from(
 )
 
 export default function CashFlowPage() {
-  const [cashFlows, setCashFlows] = useState<CashFlow[]>([])
-  const [summary, setSummary] = useState<CashFlowSummary | null>(null)
-  const [monthly, setMonthly] = useState<MonthlyReport[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'list' | 'monthly'>('list')
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [first, setFirst] = useState(0)
+  const queryClient = useQueryClient()
 
-  // Filter
-  const [search, setSearch] = useState('')
-  const [filterType, setFilterType] = useState('ALL')
-  const [filterDateRange, setFilterDateRange] = useState<[Date | null, Date | null]>([null, null])
-
-  const fetchAll = async () => {
-    try {
-      const [cfRes, sumRes, monRes] = await Promise.all([
-        api.get('/cash-flows'),
-        api.get('/cash-flows/summary'),
-        api.get(`/cash-flows/monthly?year=${selectedYear}`),
-      ])
-      setCashFlows(cfRes.data.data)
-      setSummary(sumRes.data.data)
-      setMonthly(monRes.data.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchMonthly = async () => {
-    try {
-      const res = await api.get(`/cash-flows/monthly?year=${selectedYear}`)
-      setMonthly(res.data.data)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  useEffect(() => { fetchAll() }, [])
-
-  // Refetch monthly saat tahun berubah
-  useEffect(() => { fetchMonthly() }, [selectedYear])
-
-  // Reset pagination saat filter berubah
-  useEffect(() => { setFirst(0) }, [search, filterType, filterDateRange])
-
-  const handleSubmitSucces = async () => {
-    await fetchAll()
-    setShowModal(false)
-  }
-
-  const filteredCashFlows = cashFlows.filter(cf => {
-    const matchSearch =
-      cf.description.toLowerCase().includes(search.toLowerCase()) ||
-      cf.category.toLowerCase().includes(search.toLowerCase())
-    const matchType = filterType === 'ALL' || cf.type === filterType
-    const matchDate = (() => {
-      if (!filterDateRange?.[0]) return true
-      const date = new Date(cf.transactionDate)
-      date.setHours(0, 0, 0, 0)
-      const start = new Date(filterDateRange[0]!)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(filterDateRange[1] ?? filterDateRange[0]!)
-      end.setHours(23, 59, 59, 999)
-      return date >= start && date <= end
-    })()
-    return matchSearch && matchType && matchDate
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'transactionDate',
+    sortOrder: -1 as 1 | -1 | 0 | null,
+    search: '',
+    filterType: 'ALL',
+    filterDateRange: [null, null] as [Date | null, Date | null]
   })
 
+  const [activeTab, setActiveTab] = useState<'list' | 'monthly' | 'profit-loss'>('list')
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  
+  const [showModal, setShowModal] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [exportYear, setExportYear] = useState(new Date().getFullYear())
+  const [exportMonth, setExportMonth] = useState(new Date().getMonth() + 1)
+
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: pageData, isLoading } = useCashFlows({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`
+  })
+  
+  const { data: summary } = useCashFlowSummary()
+  const { data: monthly = [] } = useMonthlyCashFlow(selectedYear)
+  const { data: plData, isLoading: plLoading } = useProfitLoss(selectedYear, selectedMonth)
+  const downloadReport = useDownloadMonthlyReport()
+
+  const cashFlows = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: CASHFLOW_KEYS.all })
+
+  const handleExportExcel = () => {
+    downloadReport.mutate({ year: exportYear, month: exportMonth })
+    setShowExportDialog(false)
+  }
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
+  }
+
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
+
   // Hitung total saldo rekap bulanan
-  const totalMonthlyIn = monthly.reduce((sum, m) => sum + (m.totalIn ?? 0), 0)
-  const totalMonthlyOut = monthly.reduce((sum, m) => sum + (m.totalOut ?? 0), 0)
+  const totalMonthlyIn = (monthly as any[]).reduce((sum, m) => sum + (m.totalIn ?? 0), 0)
+  const totalMonthlyOut = (monthly as any[]).reduce((sum, m) => sum + (m.totalOut ?? 0), 0)
   const totalMonthlyBalance = totalMonthlyIn - totalMonthlyOut
 
   const columns = [
     {
-      header: 'Tgl', body: (row: CashFlow) => (
+      header: 'Tgl', field: 'transactionDate', sortable: true, body: (row: CashFlow) => (
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDate(row.transactionDate)}</span>
       )
     },
-    { header: 'Tipe', body: (row: CashFlow) => <StatusBadge status={row.type} /> },
+    { header: 'Tipe', field: 'type', sortable: true, body: (row: CashFlow) => <StatusBadge status={row.type} /> },
     {
-      header: 'Kategori', body: (row: CashFlow) => (
+      header: 'Kategori', field: 'category', sortable: true, body: (row: CashFlow) => (
         <span style={{ fontSize: 12 }}>{row.category}</span>
       )
     },
-    { header: 'Deskripsi', field: 'description' },
+    { header: 'Deskripsi', field: 'description', sortable: true },
     {
-      header: 'Jumlah', body: (row: CashFlow) => (
+      header: 'Jumlah', field: 'amount', sortable: true, body: (row: CashFlow) => (
         <span style={{ fontWeight: 600, color: row.type === 'IN' ? '#2E7D32' : '#C62828' }}>
           {row.type === 'IN' ? '+' : '-'}{formatRupiah(row.amount)}
         </span>
       )
     },
     {
-      header: 'Sumber', body: (row: CashFlow) => (
+      header: 'Sumber', field: 'referenceType', sortable: true, body: (row: CashFlow) => (
         <span style={{ fontSize: 11, color: 'var(--muted)' }}>
           {row.referenceType ?? 'Manual'}
         </span>
@@ -136,13 +127,7 @@ export default function CashFlowPage() {
             label="Export Excel"
             icon={<FileSpreadsheet size={13} />}
             variant="secondary"
-            onClick={() => toast.info('Segera Hadir', 'Fitur export Excel sedang dikembangkan')}
-          />
-          <Button
-            label="Export PDF"
-            icon={<FileText size={13} />}
-            variant="secondary"
-            onClick={() => toast.info('Segera Hadir', 'Fitur export PDF sedang dikembangkan')}
+            onClick={() => setShowExportDialog(true)}
           />
           <Button
             label="Input Manual"
@@ -152,24 +137,78 @@ export default function CashFlowPage() {
         </div>
       </div>
 
+      {/* Export Excel Dialog */}
+      {showExportDialog && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'var(--white)', borderRadius: 12, padding: 24, width: 320,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Calendar size={18} color="var(--accent)" />
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Export Laporan Bulanan</div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tahun</label>
+              <select
+                value={exportYear}
+                onChange={(e) => setExportYear(Number(e.target.value))}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--white)',
+                  fontSize: 13, color: 'var(--text)', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Bulan</label>
+              <select
+                value={exportMonth}
+                onChange={(e) => setExportMonth(Number(e.target.value))}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--white)',
+                  fontSize: 13, color: 'var(--text)', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                {monthNames.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button label="Batal" variant="secondary" onClick={() => setShowExportDialog(false)} />
+              <Button
+                label={downloadReport.isPending ? 'Downloading...' : 'Download'}
+                icon={<FileSpreadsheet size={13} />}
+                onClick={handleExportExcel}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           {
             label: 'Total Pemasukan',
-            value: formatRupiah(summary?.totalIn ?? 0),
+            value: formatRupiah((summary as any)?.totalIn ?? 0),
             icon: <TrendingUp size={16} color="#2E7D32" />,
             bg: '#E8F5E9', color: '#2E7D32',
           },
           {
             label: 'Total Pengeluaran',
-            value: formatRupiah(summary?.totalOut ?? 0),
+            value: formatRupiah((summary as any)?.totalOut ?? 0),
             icon: <TrendingDown size={16} color="#C62828" />,
             bg: '#FFEBEE', color: '#C62828',
           },
           {
             label: 'Saldo',
-            value: formatRupiah(summary?.balance ?? 0),
+            value: formatRupiah((summary as any)?.balance ?? 0),
             icon: <Wallet size={16} color="#1565A0" />,
             bg: '#E3F2FB', color: '#1565A0',
           },
@@ -202,6 +241,7 @@ export default function CashFlowPage() {
         {[
           { key: 'list', label: 'Transaksi' },
           { key: 'monthly', label: 'Rekap Bulanan' },
+          { key: 'profit-loss', label: 'Laba Rugi' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -226,15 +266,19 @@ export default function CashFlowPage() {
         <>
           <FilterBar
             config={{
-              search: { value: search, onChange: setSearch, placeholder: 'Cari deskripsi atau kategori...' },
+              search: { 
+                value: lazyParams.search, 
+                onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })), 
+                placeholder: 'Cari deskripsi atau kategori...' 
+              },
               dateRange: {
-                value: filterDateRange,
-                onChange: (val) => setFilterDateRange(val ?? [null, null]),
+                value: lazyParams.filterDateRange,
+                onChange: (val) => setLazyParams(p => ({ ...p, filterDateRange: val ?? [null, null], page: 0, first: 0 })),
                 placeholder: 'Filter tanggal'
               },
               dropdowns: [{
-                value: filterType,
-                onChange: setFilterType,
+                value: lazyParams.filterType,
+                onChange: (v) => setLazyParams(p => ({ ...p, filterType: v, page: 0, first: 0 })),
                 options: [
                   { label: 'Semua Tipe', value: 'ALL' },
                   { label: 'Pemasukan', value: 'IN' },
@@ -243,20 +287,26 @@ export default function CashFlowPage() {
                 placeholder: 'Tipe',
               }],
             }}
-            onReset={() => { setSearch(''); setFilterType('ALL'); setFilterDateRange([null, null]) }}
-            hasActiveFilter={!!(search || filterType !== 'ALL' || filterDateRange[0])}
-            onRefresh={fetchAll}
+            onReset={() => setLazyParams(p => ({ ...p, search: '', filterType: 'ALL', filterDateRange: [null, null], page: 0, first: 0 }))}
+            hasActiveFilter={!!(lazyParams.search || lazyParams.filterType !== 'ALL' || lazyParams.filterDateRange?.[0])}
+            onRefresh={refresh}
           />
           <Table
-            data={filteredCashFlows}
+            data={cashFlows}
             columns={columns}
-            loading={loading}
+            loading={isLoading}
             emptyMessage="Belum ada transaksi"
-            first={first}
-            onFirstChange={setFirst}
+            lazy
+            totalRecords={totalRecords}
+            first={lazyParams.first}
+            rows={lazyParams.rows}
+            onPage={onPage}
+            onSort={onSort}
+            sortField={lazyParams.sortField}
+            sortOrder={lazyParams.sortOrder}
           />
         </>
-      ) : (
+      ) : activeTab === 'monthly' ? (
         /* Rekap Bulanan */
         <div>
           {/* Year selector */}
@@ -293,14 +343,14 @@ export default function CashFlowPage() {
                 </tr>
               </thead>
               <tbody>
-                {monthly.length === 0 ? (
+                {(monthly as any[]).length === 0 ? (
                   <tr>
                     <td colSpan={4} style={{ padding: '20px 14px', textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
                       Tidak ada data untuk tahun {selectedYear}
                     </td>
                   </tr>
                 ) : (
-                  monthly.map((m, i) => (
+                  (monthly as any[]).map((m, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
                         {m.month ? monthNames[m.month - 1] : ''} {m.year}
@@ -319,7 +369,7 @@ export default function CashFlowPage() {
                 )}
               </tbody>
               {/* Total row */}
-              {monthly.length > 0 && (
+              {(monthly as any[]).length > 0 && (
                 <tfoot>
                   <tr style={{ background: 'var(--sidebar-bg)', borderTop: '2px solid var(--border)' }}>
                     <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
@@ -340,12 +390,78 @@ export default function CashFlowPage() {
             </table>
           </div>
         </div>
+      ) : (
+        /* Laba Rugi */
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--white)', fontSize: 13 }}
+            >
+              {monthNames.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--white)', fontSize: 13 }}
+            >
+              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+            <div style={{ textAlign: 'center', marginBottom: 30 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Laporan Laba Rugi</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Periode {monthNames[selectedMonth - 1]} {selectedYear}</div>
+            </div>
+
+            {plLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>Memuat data...</div>
+            ) : (
+              <div style={{ maxWidth: 600, margin: '0 auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderRadius: 8, background: '#F8F9FA' }}>
+                    <span style={{ fontWeight: 500 }}>Pendapatan (Revenue)</span>
+                    <span style={{ fontWeight: 600 }}>{formatRupiah(plData?.revenue ?? 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', color: '#C62828' }}>
+                    <span style={{ fontWeight: 500 }}>Harga Pokok Penjualan (HPP)</span>
+                    <span style={{ fontWeight: 600 }}>({formatRupiah(plData?.cogs ?? 0)})</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderRadius: 8, background: '#E3F2FD', color: '#1565C0', marginTop: 4 }}>
+                    <div>
+                      <span style={{ fontWeight: 700 }}>Laba Kotor (Gross Profit)</span>
+                      <div style={{ fontSize: 11, fontWeight: 500 }}>Margin Kotor: {plData?.grossMargin ?? 0}%</div>
+                    </div>
+                    <span style={{ fontWeight: 700 }}>{formatRupiah(plData?.grossProfit ?? 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', color: '#C62828', marginTop: 12 }}>
+                    <span style={{ fontWeight: 500 }}>Biaya Operasional</span>
+                    <span style={{ fontWeight: 600 }}>({formatRupiah(plData?.operationalExpenses ?? 0)})</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', borderRadius: 8, background: (plData?.netProfit ?? 0) >= 0 ? '#E8F5E9' : '#FFEBEE', color: (plData?.netProfit ?? 0) >= 0 ? '#2E7D32' : '#C62828', marginTop: 8 }}>
+                    <div>
+                      <span style={{ fontSize: 16, fontWeight: 800 }}>Laba Bersih (Net Profit)</span>
+                      <div style={{ fontSize: 11, fontWeight: 600 }}>Margin Bersih: {plData?.netMargin ?? 0}%</div>
+                    </div>
+                    <span style={{ fontSize: 18, fontWeight: 800 }}>{formatRupiah(plData?.netProfit ?? 0)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       <CreateManualCashFlow
         visible={showModal}
         onHide={() => setShowModal(false)}
-        onSuccess={handleSubmitSucces}
+        onSuccess={() => { refresh(); setShowModal(false) }}
       />
     </div>
   )

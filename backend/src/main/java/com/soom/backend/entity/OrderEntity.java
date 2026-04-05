@@ -7,6 +7,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -15,6 +18,8 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @NoArgsConstructor
+@SQLDelete(sql = "UPDATE orders SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class OrderEntity extends BaseEntity{
     @Column(name = "order_number", unique = true)
     private String orderNumber;
@@ -53,4 +58,8 @@ public class OrderEntity extends BaseEntity{
 
     @Column(name = "system_notes", columnDefinition = "text")
     private String systemNotes;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private TenantEntity tenant;
 }

@@ -13,6 +13,7 @@ public class RecipeItemResponse {
     private UUID ingredientId;
     private String ingredientName;
     private String unitSymbol;
+    private String unitName;
     private BigDecimal quantity;
     private UUID unitId;
 }

@@ -1,19 +1,19 @@
 package com.soom.backend.service;
 
+import com.soom.backend.context.TenantContext;
 import com.soom.backend.dto.request.CreateUserRequest;
 import com.soom.backend.dto.request.UpdateUserRequest;
-import com.soom.backend.dto.response.AuthResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.dto.response.UserResponse;
 import com.soom.backend.entity.UserEntity;
 import com.soom.backend.repository.UserRepository;
 import com.soom.backend.utils.AuthUtil;
-import com.soom.backend.utils.PasswordGenerator;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -25,19 +25,11 @@ public class UserService {
     private final AuthUtil authUtil;
     private final EmailService emailService;
 
-
-    public List<UserResponse> getAll(){
-        return userRepository.findAll()
-                .stream()
-                .filter(user -> !user.getIsDeleted())
-                .map(user -> UserResponse.builder()
-                        .id(user.getId())
-                        .name(user.getName())
-                        .email(user.getEmail())
-                        .role(user.getRole())
-                        .isActive(user.getIsActive())
-                        .build())
-                .toList();
+    public PageResponse<UserResponse> getAll(Pageable pageable, String search) {
+        UUID tenantId = TenantContext.getTenantId();
+        String searchParam = (search != null && !search.isEmpty()) ? "%" + search.toLowerCase() + "%" : null;
+        Page<UserEntity> page = userRepository.findAllActive(tenantId, searchParam, pageable);
+        return PageResponse.of(page.map(this::toResponse));
     }
 
     public UserResponse createUser(CreateUserRequest request){
@@ -49,8 +41,6 @@ public class UserService {
             throw new RuntimeException("Nama sudah terdaftar");
         }
 
-//        String rawPassword = PasswordGenerator.generate();
-
         UserEntity user = new UserEntity();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
@@ -60,19 +50,7 @@ public class UserService {
 
         userRepository.save(user);
 
-        // kirim email welcome
-//        emailService.sendWelcomeEmail(
-//                request.getEmail(),
-//                request.getName(),
-//                rawPassword
-//        );
-
-        return UserResponse.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .role(user.getRole())
-                .build();
+        return toResponse(user);
     }
 
     public UserEntity findById(UUID id){
@@ -87,12 +65,7 @@ public class UserService {
         user.setRole(request.getRole());
         user.setIsActive(request.getIsActive());
         userRepository.save(user);
-        return UserResponse.builder()
-                .email(user.getEmail())
-                .name(user.getName())
-                .role(user.getRole())
-                .id(user.getId())
-                .build();
+        return toResponse(user);
     }
 
     public void deleteUser(UUID id){
@@ -101,4 +74,13 @@ public class UserService {
         userRepository.save(user);
     }
 
+    private UserResponse toResponse(UserEntity user) {
+        return UserResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .isActive(user.getIsActive())
+                .build();
+    }
 }

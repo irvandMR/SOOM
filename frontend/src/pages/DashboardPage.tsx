@@ -32,9 +32,9 @@ interface StockAlert {
 }
 
 const statusMap: Record<string, { bg: string; color: string; label: string }> = {
-  PENDING:   { bg: '#FFF8E1', color: '#E65100', label: 'Pending' },
-  PROCESS:   { bg: '#E3F2FB', color: '#1565A0', label: 'Process' },
-  DONE:      { bg: '#E8F5E9', color: '#2E7D32', label: 'Done' },
+  PENDING: { bg: '#FFF8E1', color: '#E65100', label: 'Pending' },
+  PROCESS: { bg: '#E3F2FB', color: '#1565A0', label: 'Process' },
+  DONE: { bg: '#E8F5E9', color: '#2E7D32', label: 'Done' },
   DELIVERED: { bg: '#E8F5E9', color: '#2E7D32', label: 'Delivered' },
   CANCELLED: { bg: '#FFEBEE', color: '#C62828', label: 'Cancelled' },
 }
@@ -118,10 +118,12 @@ export default function DashboardPage() {
           api.get('/dashboard/stock-alerts'),
           api.get('/productions'),
         ])
-        setSummary(summaryRes.data.data)
-        setRecentOrders(ordersRes.data.data)
-        setStockAlerts(alertsRes.data.data)
-        setRecentProductions(prodRes.data.data.slice(0, 5))
+        setSummary(summaryRes.data?.data ?? null)
+        setRecentOrders(ordersRes.data?.data ?? [])
+        setStockAlerts(alertsRes.data?.data ?? [])
+
+        const productions = prodRes.data?.data
+        setRecentProductions(Array.isArray(productions) ? productions.slice(0, 5) : [])
       } catch (err) {
         console.error(err)
       } finally {
@@ -138,7 +140,7 @@ export default function DashboardPage() {
       tag: 'order masuk',
       tagStyle: { bg: '#E3F2FB', color: '#1565A0' },
       iconBg: '#E3F2FB',
-      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h9M2 12h6" stroke="#1565A0" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h9M2 12h6" stroke="#1565A0" strokeWidth="1.5" strokeLinecap="round" /></svg>,
     },
     {
       label: 'Pemasukan',
@@ -146,7 +148,7 @@ export default function DashboardPage() {
       tag: 'hari ini',
       tagStyle: { bg: '#E8F5E9', color: '#2E7D32' },
       iconBg: '#E8F5E9',
-      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M4 6l4-4 4 4" stroke="#2E7D32" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M4 6l4-4 4 4" stroke="#2E7D32" strokeWidth="1.5" strokeLinecap="round" /></svg>,
     },
     {
       label: 'Pengeluaran',
@@ -154,7 +156,7 @@ export default function DashboardPage() {
       tag: 'hari ini',
       tagStyle: { bg: '#FFEBEE', color: '#C62828' },
       iconBg: '#FFEBEE',
-      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 14V2M4 10l4 4 4-4" stroke="#C62828" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 14V2M4 10l4 4 4-4" stroke="#C62828" strokeWidth="1.5" strokeLinecap="round" /></svg>,
     },
     {
       label: 'Stok Kritis',
@@ -162,7 +164,7 @@ export default function DashboardPage() {
       tag: 'perlu restock',
       tagStyle: { bg: '#FFF8E1', color: '#E65100' },
       iconBg: '#FFF8E1',
-      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#E65100" strokeWidth="1.4"/><path d="M8 5v3" stroke="#E65100" strokeWidth="1.5" strokeLinecap="round"/><circle cx="8" cy="11" r="0.8" fill="#E65100"/></svg>,
+      icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#E65100" strokeWidth="1.4" /><path d="M8 5v3" stroke="#E65100" strokeWidth="1.5" strokeLinecap="round" /><circle cx="8" cy="11" r="0.8" fill="#E65100" /></svg>,
     },
   ]
 
@@ -250,116 +252,116 @@ export default function DashboardPage() {
 
             {/* Order Terbaru */}
             <div style={{
-                background: 'var(--white)',
-                border: '1px solid var(--border)',
-                borderRadius: 10, padding: 16,
+              background: 'var(--white)',
+              border: '1px solid var(--border)',
+              borderRadius: 10, padding: 16,
             }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Order Terbaru</span>
                 <span onClick={() => navigate('/orders')} style={{ fontSize: 11, color: 'var(--accent)', cursor: 'pointer' }}>
-                    Lihat semua →
+                  Lihat semua →
                 </span>
-                </div>
-                {recentOrders.length === 0 ? (
+              </div>
+              {recentOrders.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
-                    Belum ada order
+                  Belum ada order
                 </div>
-                ) : (
+              ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {recentOrders.map((order) => (
+                  {recentOrders.map((order) => (
                     <div
-                        key={order.id}
-                        onClick={() => navigate('/orders')}
-                        style={{
+                      key={order.id}
+                      onClick={() => navigate('/orders')}
+                      style={{
                         background: 'var(--sidebar-bg)',
                         border: '1px solid var(--border)',
                         borderRadius: 8, padding: '10px 12px',
                         display: 'flex', justifyContent: 'space-between',
                         alignItems: 'center', cursor: 'pointer',
-                        }}
+                      }}
                     >
-                        <div>
+                      <div>
                         <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
-                            {order.customerName}
+                          {order.customerName}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            {formatDate(order.orderDate)} · {order.orderNumber}
+                          {formatDate(order.orderDate)} · {order.orderNumber}
                         </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
                         <span style={{
-                            fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
-                            background: statusMap[order.status]?.bg ?? '#f5f5f5',
-                            color: statusMap[order.status]?.color ?? '#666',
-                            display: 'block', marginBottom: 3,
+                          fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
+                          background: statusMap[order.status]?.bg ?? '#f5f5f5',
+                          color: statusMap[order.status]?.color ?? '#666',
+                          display: 'block', marginBottom: 3,
                         }}>
-                            {statusMap[order.status]?.label ?? order.status}
+                          {statusMap[order.status]?.label ?? order.status}
                         </span>
                         <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            {formatRupiah(order.totalAmount)}
+                          {formatRupiah(order.totalAmount)}
                         </div>
-                        </div>
+                      </div>
                     </div>
-                    ))}
+                  ))}
                 </div>
-                )}
+              )}
             </div>
 
             {/* Produksi Terbaru */}
             <div style={{
-                background: 'var(--white)',
-                border: '1px solid var(--border)',
-                borderRadius: 10, padding: 16,
+              background: 'var(--white)',
+              border: '1px solid var(--border)',
+              borderRadius: 10, padding: 16,
             }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Produksi Terbaru</span>
                 <span onClick={() => navigate('/productions')} style={{ fontSize: 11, color: 'var(--accent)', cursor: 'pointer' }}>
-                    Lihat semua →
+                  Lihat semua →
                 </span>
-                </div>
-                {recentProductions.length === 0 ? (
+              </div>
+              {recentProductions.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
-                    Belum ada produksi
+                  Belum ada produksi
                 </div>
-                ) : (
+              ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {recentProductions.map((prod) => (
+                  {recentProductions.map((prod) => (
                     <div
-                        key={prod.id}
-                        onClick={() => navigate('/productions')}
-                        style={{
+                      key={prod.id}
+                      onClick={() => navigate('/productions')}
+                      style={{
                         background: 'var(--sidebar-bg)',
                         border: '1px solid var(--border)',
                         borderRadius: 8, padding: '10px 12px',
                         display: 'flex', justifyContent: 'space-between',
                         alignItems: 'center', cursor: 'pointer',
-                        }}
+                      }}
                     >
-                        <div>
+                      <div>
                         <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
-                            {prod.productName}
+                          {prod.productName}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            {formatDate(prod.productionDate)} · Versi {prod.recipeVersion}
+                          {formatDate(prod.productionDate)} · Versi {prod.recipeVersion}
                         </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
                         <span style={{
-                            fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
-                            background: prod.status === 'SUCCESS' ? '#E8F5E9' : '#FFEBEE',
-                            color: prod.status === 'SUCCESS' ? '#2E7D32' : '#C62828',
-                            display: 'block', marginBottom: 3,
+                          fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 500,
+                          background: prod.status === 'SUCCESS' ? '#E8F5E9' : '#FFEBEE',
+                          color: prod.status === 'SUCCESS' ? '#2E7D32' : '#C62828',
+                          display: 'block', marginBottom: 3,
                         }}>
-                            {prod.status === 'SUCCESS' ? 'Sukses' : 'Gagal'}
+                          {prod.status === 'SUCCESS' ? 'Sukses' : 'Gagal'}
                         </span>
                         <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            {prod.quantityProduced} unit
+                          {prod.quantityProduced} unit
                         </div>
-                        </div>
+                      </div>
                     </div>
-                    ))}
+                  ))}
                 </div>
-                )}
+              )}
             </div>
 
           </div>

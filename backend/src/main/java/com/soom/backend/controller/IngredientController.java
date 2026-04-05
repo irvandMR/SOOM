@@ -6,9 +6,12 @@ import com.soom.backend.dto.request.UpdateIngredientRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.IngredientHistoryResponse;
 import com.soom.backend.dto.response.IngredientResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.service.IngredientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,11 +25,13 @@ public class IngredientController {
     private final IngredientService ingredientService;
 
     @GetMapping
-    public ResponseEntity<BaseResponse<List<IngredientResponse>>> getAll() {
-        return ResponseEntity.ok(BaseResponse.<List<IngredientResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<IngredientResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "name") Pageable pageable,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<IngredientResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(ingredientService.getAll())
+                .data(ingredientService.getAll(pageable, search))
                 .build());
     }
 

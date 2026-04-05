@@ -31,7 +31,21 @@ public class UnitConversionHelper {
      */
     public static boolean isCompatible(UnitsEntity unit1, UnitsEntity unit2) {
         if (unit1.getBaseUnit() == null || unit2.getBaseUnit() == null) return false;
-        return unit1.getBaseUnit().equals(unit2.getBaseUnit());
+        
+        String base1 = unit1.getBaseUnit().toLowerCase();
+        String base2 = unit2.getBaseUnit().toLowerCase();
+        
+        if (base1.equals(base2)) return true;
+
+        boolean isMass1 = base1.equals("g") || base1.equals("mass");
+        boolean isMass2 = base2.equals("g") || base2.equals("mass");
+        if (isMass1 && isMass2) return true;
+
+        boolean isVol1 = base1.equals("ml") || base1.equals("volume");
+        boolean isVol2 = base2.equals("ml") || base2.equals("volume");
+        if (isVol1 && isVol2) return true;
+
+        return false;
     }
 
     /**

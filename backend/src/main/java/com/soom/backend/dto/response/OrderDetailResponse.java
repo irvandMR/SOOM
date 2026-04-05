@@ -26,4 +26,5 @@ public class OrderDetailResponse {
     private String systemNotes;
     private List<OrderItemResponse> items;
     private List<OrderPaymentResponse> payments;
+    private String tenant;
 }

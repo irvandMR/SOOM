@@ -1,8 +1,10 @@
 package com.soom.backend.service;
 
+import com.soom.backend.context.TenantContext;
 import com.soom.backend.dto.request.CreateProductionRequest;
 import com.soom.backend.dto.response.ProductionDetailResponse;
 import com.soom.backend.dto.response.ProductionResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.entity.*;
 import com.soom.backend.enums.ProductionStatus;
 import com.soom.backend.enums.ProductType;
@@ -13,6 +15,8 @@ import com.soom.backend.repository.*;
 import com.soom.backend.util.UnitConversionHelper;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -31,10 +35,19 @@ public class ProductionService {
     private final ProductRecipeItemRepository recipeItemRepository;
     private final IngredientRepository ingredientRepository;
     private final IngredientStockHistoryRepository stockHistoryRepository;
+    private final CashFlowRepository cashFlowRepository;
+    private final TenantRepository tenantRepository;
 
-    public List<ProductionResponse> getAll() {
-        return productionRepository.findByIsDeletedFalseOrderByProductionDateDesc()
-                .stream().map(this::toResponse).toList();
+    public PageResponse<ProductionResponse> getAll(Pageable pageable, String search) {
+        String searchParam = (search != null && !search.isEmpty()) ? "%" + search.toLowerCase() + "%" : null;
+        Page<ProductionEntity> page = productionRepository.findAllActive(TenantContext.getTenantId(), searchParam, pageable);
+        return PageResponse.of(page.map(p -> {
+            try {
+                return toResponse(p);
+            } catch (Exception e) {
+                return null;
+            }
+        }));
     }
 
     public ProductionResponse getById(UUID id) {
@@ -43,14 +56,14 @@ public class ProductionService {
 
     public List<ProductionResponse> getAvailable(UUID productId) {
         return productionRepository
-                .findByProduct_IdAndAvailableQtyGreaterThanAndIsDeletedFalse(productId, BigDecimal.ZERO)
+                .findByTenantIdAndProduct_IdAndAvailableQtyGreaterThanAndIsDeletedFalse(TenantContext.getTenantId(),productId, BigDecimal.ZERO)
                 .stream().map(this::toResponse).toList();
     }
 
     public ProductionDetailResponse getDetail(UUID id) {
         ProductionEntity production = findById(id);
         List<ProductRecipeItemEntity> recipeItems =
-                recipeItemRepository.findByRecipesIdAndIsDeletedFalse(production.getRecipes().getId());
+                recipeItemRepository.findByRecipesIdAndTenantIdAndIsDeletedFalse(production.getRecipes().getId(), TenantContext.getTenantId());
 
         BigDecimal quantityProduced = production.getQuantityProduced();
         String productUnitSymbol = production.getProduct().getUnit().getSymbol();
@@ -139,7 +152,7 @@ public class ProductionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Resep tidak ditemukan"));
 
         List<ProductRecipeItemEntity> recipeItems =
-                recipeItemRepository.findByRecipesIdAndIsDeletedFalse(recipes.getId());
+                recipeItemRepository.findByRecipesIdAndTenantIdAndIsDeletedFalse(recipes.getId(), TenantContext.getTenantId());
 
         // Hitung batch
         BigDecimal estimatedYield = recipes.getEstimatedYield();
@@ -206,6 +219,7 @@ public class ProductionService {
 
             ingredient.setStockQuantity(ingredient.getStockQuantity().subtract(qtyInStockUnit));
             ingredientRepository.save(ingredient);
+            ingredientRepository.flush(); // Ensure stock deduction is flushed
 
             IngredientStockHistoryEntity stockHistory = new IngredientStockHistoryEntity();
             stockHistory.setIngredients(ingredient);
@@ -220,6 +234,17 @@ public class ProductionService {
         // Actual yield — fallback ke quantityProduced
         BigDecimal actualYield = request.getActualYield();
 
+        // ── Snapshot HPP saat produksi (harga bahan saat ini, tidak akan berubah) ──
+        BigDecimal totalActualCost = computeTotalCost(recipeItems, batch);
+        BigDecimal actualOrProduced = (actualYield != null && actualYield.compareTo(BigDecimal.ZERO) > 0)
+                ? actualYield : request.getQuantityProduced();
+        BigDecimal actualCostPerUnit = BigDecimal.ZERO;
+        if (actualOrProduced.compareTo(BigDecimal.ZERO) > 0) {
+            actualCostPerUnit = totalActualCost.divide(actualOrProduced, 2, RoundingMode.HALF_UP);
+        }
+
+        UUID tenantId = TenantContext.getTenantId();
+
         ProductionEntity production = new ProductionEntity();
         production.setProduct(product);
         production.setRecipes(recipes);
@@ -230,18 +255,56 @@ public class ProductionService {
         production.setStatus(ProductionStatus.SUCCESS);
         production.setNotes(request.getNotes());
         production.setExpiredDate(request.getExpiredDate());
+        production.setTenant(tenantRepository.getReferenceById(tenantId));
+        // Simpan snapshot HPP
+        production.setActualCostPerUnit(actualCostPerUnit);
+        production.setTotalActualCost(totalActualCost);
         productionRepository.save(production);
 
-        if (product.getType() == ProductType.MADE_TO_STOCK) {
-            BigDecimal addQty = actualYield != null ? actualYield : request.getQuantityProduced();
-            product.setStockQuantity(product.getStockQuantity().add(addQty));
-            productRepository.save(product);
+        // Update stock product for all produced types
+        BigDecimal addQty = actualYield != null ? actualYield : request.getQuantityProduced();
+        product.setStockQuantity(product.getStockQuantity().add(addQty));
+        productRepository.save(product);
+        productRepository.flush(); // Ensure product stock increase is flushed
+
+        // ─── PENCATATAN CASH FLOW (Biaya Produksi) ───
+        if (totalActualCost.compareTo(BigDecimal.ZERO) > 0) {
+            CashFlowEntity cashFlow = new CashFlowEntity();
+            cashFlow.setTenant(tenantRepository.getReferenceById(tenantId));
+            cashFlow.setType(com.soom.backend.enums.CashFlowType.OUT);
+            cashFlow.setCategory("Biaya Produksi");
+            cashFlow.setAmount(totalActualCost);
+            cashFlow.setDescription("Biaya Produksi: " + product.getName() + " (" + 
+                (actualYield != null ? actualYield : request.getQuantityProduced()) + " " + product.getUnit().getSymbol() + ")");
+            cashFlow.setTransactionDate(request.getProductionDate());
+            cashFlow.setReferenceType("PRODUCTION");
+            cashFlow.setReferenceId(production.getId());
+            cashFlowRepository.save(cashFlow);
         }
 
         return toResponse(production);
     }
 
-    // ─── HELPER ───
+    // ─── HELPER: hitung total cost dari recipe items × batch ───
+    private BigDecimal computeTotalCost(List<ProductRecipeItemEntity> items, BigDecimal batch) {
+        return items.stream()
+                .map(item -> {
+                    UnitsEntity recipeUnit = item.getUnits();
+                    UnitsEntity stockUnit = item.getIngredients().getUnit();
+                    BigDecimal qtyInRecipeUnit = item.getQuantity().multiply(batch);
+                    BigDecimal qtyInStockUnit;
+                    if (recipeUnit.getId().equals(stockUnit.getId())) {
+                        qtyInStockUnit = qtyInRecipeUnit;
+                    } else if (UnitConversionHelper.isCompatible(recipeUnit, stockUnit)) {
+                        qtyInStockUnit = UnitConversionHelper.convert(qtyInRecipeUnit, recipeUnit, stockUnit);
+                    } else {
+                        qtyInStockUnit = qtyInRecipeUnit;
+                    }
+                    return qtyInStockUnit.multiply(item.getIngredients().getAvgPurchasePrice());
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     private String formatQty(BigDecimal qty) {
         return qty.stripTrailingZeros().toPlainString();
     }
@@ -256,49 +319,17 @@ public class ProductionService {
     }
 
     private ProductionResponse toResponse(ProductionEntity production) {
-        List<ProductRecipeItemEntity> items =
-                recipeItemRepository.findByRecipesIdAndIsDeletedFalse(production.getRecipes().getId());
+        // ── Pakai snapshot HPP dari DB (tidak hitung ulang) ──
+        BigDecimal actualCostPerUnit = production.getActualCostPerUnit();
+        BigDecimal totalActualCost   = production.getTotalActualCost();
+
+        // Harga rekomendasi = HPP per unit / 0.70 (margin 30%)
+        BigDecimal recommendedPrice = actualCostPerUnit.compareTo(BigDecimal.ZERO) > 0
+                ? actualCostPerUnit.divide(BigDecimal.valueOf(0.70), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
 
         String productUnitSymbol = production.getProduct().getUnit().getSymbol();
-        String productUnitName = production.getProduct().getUnit().getName();
-
-        BigDecimal estimatedYieldPerBatch = production.getRecipes().getEstimatedYield();
-        BigDecimal batch = BigDecimal.ONE;
-        if (estimatedYieldPerBatch != null && estimatedYieldPerBatch.compareTo(BigDecimal.ZERO) > 0) {
-            batch = production.getQuantityProduced().divide(estimatedYieldPerBatch, 4, RoundingMode.HALF_UP);
-        }
-
-        final BigDecimal finalBatch = batch;
-
-        BigDecimal totalEstimatedCost = items.stream()
-                .map(item -> {
-                    UnitsEntity recipeUnit = item.getUnits();
-                    UnitsEntity stockUnit = item.getIngredients().getUnit();
-                    BigDecimal qtyInRecipeUnit = item.getQuantity().multiply(finalBatch);
-
-                    BigDecimal qtyInStockUnit;
-                    if (recipeUnit.getId().equals(stockUnit.getId())) {
-                        qtyInStockUnit = qtyInRecipeUnit;
-                    } else if (UnitConversionHelper.isCompatible(recipeUnit, stockUnit)) {
-                        qtyInStockUnit = UnitConversionHelper.convert(qtyInRecipeUnit, recipeUnit, stockUnit);
-                    } else {
-                        qtyInStockUnit = qtyInRecipeUnit;
-                    }
-                    return qtyInStockUnit.multiply(item.getIngredients().getAvgPurchasePrice());
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal actualOrProduced = production.getActualYield() != null
-                ? production.getActualYield() : production.getQuantityProduced();
-
-        BigDecimal costPerUnit = BigDecimal.ZERO;
-        if (actualOrProduced.compareTo(BigDecimal.ZERO) > 0) {
-            costPerUnit = totalEstimatedCost.divide(actualOrProduced, 2, RoundingMode.HALF_UP);
-        }
-
-        BigDecimal recommendedPrice = costPerUnit.compareTo(BigDecimal.ZERO) > 0
-                ? costPerUnit.divide(BigDecimal.valueOf(0.70), 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        String productUnitName   = production.getProduct().getUnit().getName();
 
         return ProductionResponse.builder()
                 .id(production.getId())
@@ -312,8 +343,8 @@ public class ProductionService {
                 .estimatedYield(production.getQuantityProduced())
                 .actualYield(production.getActualYield())
                 .availableQty(production.getAvailableQty())
-                .estimatedCostPerUnit(costPerUnit)
-                .totalEstimatedCost(totalEstimatedCost)
+                .estimatedCostPerUnit(actualCostPerUnit)
+                .totalEstimatedCost(totalActualCost)
                 .recommendedPrice(recommendedPrice)
                 .recommendedPricePerUnit(BigDecimal.ZERO)
                 .productionDate(production.getProductionDate())

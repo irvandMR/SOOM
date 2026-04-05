@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -21,34 +22,54 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private long expiration;
 
-    // Dipanggil saat login berhasil — generate Access Token
-    public String generateToken(UserEntity user){
-        return Jwts.builder()
+    public String generateToken(UserEntity user) {
+        var builder = Jwts.builder()
                 .subject(user.getEmail())
                 .claim("role", user.getRole())
                 .claim("userId", user.getId().toString())
+                .claim("mustChangePassword", user.getMustChangePassword())
+                // ← tambah tenant info
+                .claim("tenantRole", user.getTenantRole());
+
+        // tenantId bisa null untuk SUPER_ADMIN
+        if (user.getTenant() != null) {
+            builder.claim("tenantId", user.getTenant().getId().toString());
+            builder.claim("businessName", user.getTenant().getBusinessName());
+        }
+
+        return builder
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey())
                 .compact();
     }
 
-    // Dipanggil di JwtAuthFilter — ambil email dari token
-    public String extractEmail(String token){
+    public String extractEmail(String token) {
         return getClaims(token).getSubject();
     }
 
-    // Dipanggil di JwtAuthFilter — cek apakah token masih valid
-    public boolean isTokenValid(String token){
-        try{
+    public String extractTenantId(String token) {
+        return getClaims(token).get("tenantId", String.class);
+    }
+
+    public String extractTenantRole(String token) {
+        return getClaims(token).get("tenantRole", String.class);
+    }
+
+    public Boolean extractMustChangePassword(String token) {
+        return getClaims(token).get("mustChangePassword", Boolean.class);
+    }
+
+    public boolean isTokenValid(String token) {
+        try {
             getClaims(token);
             return true;
-        }catch (JwtException | IllegalArgumentException e){
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
 
-    private Claims getClaims(String token){
+    private Claims getClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
@@ -56,7 +77,7 @@ public class JwtUtil {
                 .getPayload();
     }
 
-    private SecretKey getSigningKey(){
+    private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 }

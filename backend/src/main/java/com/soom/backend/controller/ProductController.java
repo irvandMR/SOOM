@@ -5,9 +5,12 @@ import com.soom.backend.dto.request.RecipeRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.ProductResponse;
 import com.soom.backend.dto.response.RecipeResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +24,13 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<BaseResponse<List<ProductResponse>>> getAll() {
-        return ResponseEntity.ok(BaseResponse.<List<ProductResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<ProductResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "name") Pageable pageable,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<ProductResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(productService.getAll())
+                .data(productService.getAll(pageable, search))
                 .build());
     }
 

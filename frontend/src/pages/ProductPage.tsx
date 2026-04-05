@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trash2, Eye, ChefHat } from 'lucide-react'
-import api from '../services/api'
 import type { Product, Recipe } from '../types/product.types'
-import { toast } from '../store/useToastStore'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
@@ -11,10 +9,18 @@ import FilterBar from '../components/common/ui/FilterBar'
 import DetailProductModal from '../components/product/detailProductModal'
 import RecipeManageModal from '../components/product/recipeManageModal'
 import AddProductModal from '../components/product/addProductModal'
-import type { Unit } from '../types/unit.types'
+import {
+  useProducts,
+  useProductRecipes,
+  useDeleteProduct,
+  PRODUCT_KEYS,
+} from '../hooks/queries/useProductQueries'
+import { useCategories } from '../hooks/queries/useCategoryQueries'
+import { useUnits } from '../hooks/queries/useUnitQueries'
+import { useIngredients } from '../hooks/queries/useIngredientQueries'
+import { useQueryClient } from '@tanstack/react-query'
 
-interface Category { id: string; name: string }
-interface Ingredient { id: string; name: string; unitSymbol: string, unitId: string }
+interface Category { id: string; name: string; type?: string }
 
 const typeLabel: Record<string, string> = {
   MADE_TO_ORDER: 'Made to Order',
@@ -23,67 +29,55 @@ const typeLabel: Record<string, string> = {
 }
 
 export default function ProductPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [ingredients, setIngredients] = useState<Ingredient[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'name',
+    sortOrder: 1 as 1 | -1 | 0 | null,
+    search: '',
+    filterType: 'ALL',
+    filterCategory: 'ALL'
+  })
+
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: pageData, isLoading } = useProducts({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`
+  })
+
+  const { data: catData } = useCategories({ size: 100 })
+  const { data: unitData } = useUnits({ size: 100 })
+  const { data: ingredientData } = useIngredients({ page: 0, size: 1000 }) // for lookup
+  const ingredients = ingredientData?.content || []
+  const deleteProduct = useDeleteProduct()
+
+  const categories = (catData?.content || []).filter((c: Category) => c?.type === 'PRODUCT')
+  const units = unitData?.content || []
+  const products = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
+  }
+
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showRecipeModal, setShowRecipeModal] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [recipes, setRecipes] = useState<Recipe[]>([])
-  const [recipeLoading, setRecipeLoading] = useState(false)
 
-  const [search, setSearch] = useState('')
-  const [filterType, setFilterType] = useState('ALL')
-  const [first, setFirst] = useState(0)
-
-  const [filterCategory, setFilterCategory] = useState('ALL') 
-
-  const fetchProducts = async () => {
-    const res = await api.get('/products')
-    setProducts(res.data.data)
-  }
-
-  const fetchRecipes = async (productId: string) => {
-    setRecipeLoading(true)
-    try {
-      const res = await api.get(`/products/${productId}/recipes`)
-      setRecipes(res.data.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setRecipeLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [prodRes, catRes, unitRes, ingRes] = await Promise.all([
-          api.get('/products'),
-          api.get('/categories'),
-          api.get('/units'),
-          api.get('/ingredients'),
-        ])
-        setProducts(prodRes.data.data)
-        setCategories(catRes.data.data.filter((c: any) => c?.type === 'PRODUCT'))
-        setUnits(unitRes.data.data)
-        setIngredients(ingRes.data.data)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchAll()
-  }, [])
-
-  useEffect(() => {
-    setFirst(0)
-  }, [search, filterType, filterCategory])
+  // Fetch recipes hanya saat ada produk yang dipilih
+  const { data: recipes = [], isLoading: recipeLoading } = useProductRecipes(selectedProduct?.id ?? null)
 
   const handleDelete = (id: string) => {
     confirmDialog({
@@ -93,137 +87,139 @@ export default function ProductPage() {
       acceptClassName: 'p-button-danger',
       acceptLabel: 'Hapus',
       rejectLabel: 'Batal',
-      accept: async () => {
-        try {
-          await api.delete(`/products/${id}`)
-          await fetchProducts()
-          toast.success('Berhasil', 'Produk berhasil dihapus')
-        } catch (err: any) {
-          toast.error('Gagal', err.response?.data?.message ?? 'Gagal menghapus')
-        }
-      },
+      accept: () => deleteProduct.mutate(id),
     })
   }
 
-  const handleSuccessSaveRecipe = async () => {
-    if (!selectedProduct) return
-    await fetchRecipes(selectedProduct.id)
-    await fetchProducts()
+  const handleOpenDetail = (product: Product) => {
+    setSelectedProduct(product)
+    setShowDetailModal(true)
   }
 
-  const filteredProducts = products.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
-    const matchType = filterType === 'ALL' || p.type === filterType
-    const matchCategory = filterCategory === 'ALL' || p.categoryName === filterCategory  // ← tambah
-    return matchSearch && matchType && matchCategory
-  })
+  const handleOpenRecipe = (product: Product) => {
+    setSelectedProduct(product)
+    setShowRecipeModal(true)
+  }
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.lists() })
 
   const columns = [
-  { header: 'Nama', field: 'name' },
-  {
-    header: 'Tipe', body: (row: Product) => (
-      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap', background: '#EEF0FB', color: '#5B6BD4' }}>
-        {typeLabel[row.type] ?? row.type}
-      </span>
-    )
-  },
-  {
-    header: 'Kategori', body: (row: Product) => (
-      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{row.categoryName}</span>
-    )
-  },
-  {
-    header: 'Versi Resep', body: (row: Product) => (
-      row.activeRecipeVersion
-        ? <span style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-            background: '#E8F5E9', color: '#2E7D32',
-          }}>
-            v{row.activeRecipeVersion}
-          </span>
-        : <span style={{ fontSize: 12, color: 'var(--muted)' }}>—</span>
-    )
-  },
-  {
-    header: 'Stok', body: (row: Product) => (
-      <span style={{ fontWeight: 500 }}>
-        {row.stockQuantity} {row.stockUnitName ?? row.unitName}
-      </span>
-    )
-  },
-  {
-    header: 'Aksi', body: (row: Product) => (
-      <div style={{ display: 'flex', gap: 6 }}>
-        <Button label="Detail" icon={<Eye size={12} />} variant="secondary" size="small"
-          tooltip="Lihat Detail"
-          onClick={() => { setSelectedProduct(row); fetchRecipes(row.id); setShowDetailModal(true) }}
-        />
-        <Button label="Resep" icon={<ChefHat size={12} />} variant="secondary" size="small"
-          tooltip="Kelola Resep"
-          onClick={() => { setSelectedProduct(row); fetchRecipes(row.id); setShowRecipeModal(true) }}
-        />
-        <Button label="Hapus" icon={<Trash2 size={12} />} variant="danger" size="small"
-          tooltip="Hapus"
-          onClick={() => handleDelete(row.id)}
-        />
-      </div>
-    )
-  },
-]
+    { header: 'Nama', field: 'name', sortable: true },
+    {
+      header: 'Tipe', field: 'type', sortable: true, body: (row: Product) => (
+        <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap', background: '#EEF0FB', color: '#5B6BD4' }}>
+          {typeLabel[row.type] ?? row.type}
+        </span>
+      )
+    },
+    {
+      header: 'Kategori', field: 'category.name', sortable: true, body: (row: Product) => (
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{row.categoryName}</span>
+      )
+    },
+    {
+      header: 'Versi Resep', body: (row: Product) => (
+        row.activeRecipeVersion
+          ? <span style={{
+              fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+              background: '#E8F5E9', color: '#2E7D32',
+            }}>
+              v{row.activeRecipeVersion}
+            </span>
+          : <span style={{ fontSize: 12, color: 'var(--muted)' }}>—</span>
+      )
+    },
+    {
+      header: 'Stok', field: 'stockQuantity', sortable: true, body: (row: Product) => (
+        <span style={{ fontWeight: 500 }}>
+          {row.stockQuantity} {row.stockUnitName ?? row.unitName}
+        </span>
+      )
+    },
+    {
+      header: 'Aksi', body: (row: Product) => (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Button label="Detail" icon={<Eye size={12} />} variant="secondary" size="small"
+            tooltip="Lihat Detail"
+            onClick={() => handleOpenDetail(row)}
+          />
+          <Button label="Resep" icon={<ChefHat size={12} />} variant="secondary" size="small"
+            tooltip="Kelola Resep"
+            onClick={() => handleOpenRecipe(row)}
+          />
+          <Button label="Hapus" icon={<Trash2 size={12} />} variant="danger" size="small"
+            tooltip="Hapus"
+            onClick={() => handleDelete(row.id)}
+          />
+        </div>
+      )
+    },
+  ]
 
   return (
     <div>
-      <PageHeader   
+      <PageHeader
         title="Produk & Resep"
-        subtitle={`${filteredProducts.length} produk terdaftar`}
+        subtitle={`${totalRecords} produk terdaftar`}
         actionLabel="Tambah Produk"
         onAction={() => setShowAddModal(true)}
       />
 
       <FilterBar
         config={{
-          search: { value: search, onChange: setSearch, placeholder: 'Cari nama produk...' },
+          search: { 
+            value: lazyParams.search, 
+            onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })), 
+            placeholder: 'Cari nama produk...' 
+          },
           dropdowns: [
             {
-              value: filterCategory,
-              onChange: setFilterCategory,
+              value: lazyParams.filterCategory,
+              onChange: (v) => setLazyParams(p => ({ ...p, filterCategory: v, page: 0, first: 0 })),
               options: [
                 { label: 'Semua Kategori', value: 'ALL' },
-                ...categories.map(c => ({ label: c.name, value: c.name })),
+                ...categories.map((c: Category) => ({ label: c.name, value: c.name })),
               ],
               placeholder: 'Kategori',
             },
             {
-            value: filterType,
-            onChange: setFilterType,
-            options: [
-              { label: 'Semua Tipe', value: 'ALL' },
-              { label: 'Made to Order', value: 'MADE_TO_ORDER' },
-              { label: 'Made to Stock', value: 'MADE_TO_STOCK' },
-              { label: 'Resell', value: 'RESELL' },
-            ],
-            placeholder: 'Tipe Produk',
-          }],
+              value: lazyParams.filterType,
+              onChange: (v) => setLazyParams(p => ({ ...p, filterType: v, page: 0, first: 0 })),
+              options: [
+                { label: 'Semua Tipe', value: 'ALL' },
+                { label: 'Made to Order', value: 'MADE_TO_ORDER' },
+                { label: 'Made to Stock', value: 'MADE_TO_STOCK' },
+                { label: 'Resell', value: 'RESELL' },
+              ],
+              placeholder: 'Tipe Produk',
+            },
+          ],
         }}
-        onReset={() => { setSearch(''); setFilterType('ALL') }}
-        hasActiveFilter={!!(search || filterType !== 'ALL')}
-        onRefresh={fetchProducts}
+        onReset={() => setLazyParams(p => ({ ...p, search: '', filterType: 'ALL', filterCategory: 'ALL', page: 0, first: 0 }))}
+        hasActiveFilter={!!(lazyParams.search || lazyParams.filterType !== 'ALL' || lazyParams.filterCategory !== 'ALL')}
+        onRefresh={refresh}
       />
 
       <Table
-        data={filteredProducts}
+        data={products}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         emptyMessage="Belum ada produk"
-        first={first}
-        onFirstChange={setFirst}
+        lazy
+        totalRecords={totalRecords}
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
       />
 
       <AddProductModal
         visible={showAddModal}
         onHide={() => setShowAddModal(false)}
-        onSuccess={fetchProducts}
-        units={units}
+        onSuccess={refresh}
+        units={units as any}
         categories={categories}
       />
 
@@ -231,21 +227,21 @@ export default function ProductPage() {
         visible={showDetailModal}
         onHide={() => { setShowDetailModal(false); setSelectedProduct(null) }}
         product={selectedProduct}
-        recipes={recipes}
-        loading={loading}
+        recipes={recipes as Recipe[]}
+        loading={recipeLoading}
         onRecipeModal={() => { setShowDetailModal(false); setShowRecipeModal(true) }}
       />
 
       <RecipeManageModal
         visible={showRecipeModal}
         onHide={() => setShowRecipeModal(false)}
-        onSuccess={handleSuccessSaveRecipe}
-        recipes={recipes}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.recipes(selectedProduct?.id ?? '') })}
+        recipes={recipes as Recipe[]}
         product={selectedProduct}
         onRecipeModal={() => setShowRecipeModal(false)}
         loading={recipeLoading}
-        ingredients={ingredients}
-        units={units}
+        ingredients={ingredients as any}
+        units={units as any}
       />
     </div>
   )

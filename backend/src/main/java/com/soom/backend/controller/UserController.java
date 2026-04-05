@@ -4,9 +4,12 @@ import com.soom.backend.dto.request.CreateUserRequest;
 import com.soom.backend.dto.request.UpdateUserRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.UserResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,11 +26,13 @@ public class UserController {
 
     @PreAuthorize("hasRole('admin')")
     @GetMapping
-    public ResponseEntity<BaseResponse<List<UserResponse>>> getAll(){
-        return ResponseEntity.ok(BaseResponse.<List<UserResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<UserResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "name", direction = org.springframework.data.domain.Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<UserResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(userService.getAll())
+                .data(userService.getAll(pageable, search))
                 .build());
     }
 

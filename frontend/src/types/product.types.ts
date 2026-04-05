@@ -18,6 +18,7 @@ export interface RecipeItem {
   ingredientName: string
   unitId: string
   unitSymbol: string
+  unitName?: string
   quantity: number
 }
 

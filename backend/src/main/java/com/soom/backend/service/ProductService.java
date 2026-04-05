@@ -1,14 +1,19 @@
 package com.soom.backend.service;
 
+import com.soom.backend.context.TenantContext;
 import com.soom.backend.dto.request.ProductRequest;
 import com.soom.backend.dto.request.RecipeItemRequest;
 import com.soom.backend.dto.request.RecipeRequest;
 import com.soom.backend.dto.response.ProductResponse;
 import com.soom.backend.dto.response.RecipeItemResponse;
 import com.soom.backend.dto.response.RecipeResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.entity.*;
 import com.soom.backend.repository.*;
+import com.soom.backend.utils.AuthUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import com.soom.backend.util.UnitConversionHelper;
 
@@ -28,27 +33,29 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final UnitRepository unitRepository;
     private final IngredientRepository ingredientRepository;
+    private final TenantRepository tenantRepository;
+    private final AuthUtil authUtil;
 
-    public List<ProductResponse> getAll() {
-        return productRepository.findByIsDeletedFalse()
-                .stream()
-                .map(product -> {
-                    Integer activeRecipeVersion = recipeRepository
-                            .findByProductIdAndIsActiveTrue(product.getId())
-                            .map(ProductRecipesEntity::getVersionNumber)
-                            .orElse(null);
+    public PageResponse<ProductResponse> getAll(Pageable pageable, String search) {
+        UUID tenantId = TenantContext.getTenantId();
+        String searchParam = (search != null && !search.isEmpty()) ? "%" + search.toLowerCase() + "%" : null;
+        Page<ProductEntity> page = productRepository.findAllActive(tenantId, searchParam, pageable);
 
-                    // Unit stok = unit produk langsung, tidak perlu query produksi
-                    return toResponseProduct(product, activeRecipeVersion);
-                })
-                .toList();
+        return PageResponse.of(page.map(product -> {
+            Integer activeRecipeVersion = recipeRepository
+                    .findByProductIdAndTenantIdAndIsActiveTrue(product.getId(), tenantId)
+                    .map(ProductRecipesEntity::getVersionNumber)
+                    .orElse(null);
+
+            return toResponseProduct(product, activeRecipeVersion);
+        }));
     }
 
     public ProductResponse getById(UUID id) {
         ProductEntity product = findProductById(id);
 
         Integer activeRecipeVersion = recipeRepository
-                .findByProductIdAndIsActiveTrue(product.getId())
+                .findByProductIdAndTenantIdAndIsActiveTrue(product.getId(), TenantContext.getTenantId())
                 .map(ProductRecipesEntity::getVersionNumber)
                 .orElse(null);
 
@@ -56,7 +63,8 @@ public class ProductService {
     }
 
     public ProductResponse create(ProductRequest request){
-        if(productRepository.existsByName(request.getName())){
+        UUID tenantId = TenantContext.getTenantId();
+        if(productRepository.existsByNameAndTenantId(request.getName(), tenantId)){
             throw new RuntimeException("Nama produk sudah ada");
         }
 
@@ -71,6 +79,8 @@ public class ProductService {
         product.setType(request.getType());
         product.setCategory(category);
         product.setUnit(units);
+        product.setTenant(tenantRepository.getReferenceById(tenantId));
+        product.setCreatedBy(authUtil.getCurrentUserEmail());
         // targetMargin & defaultPrice tidak di-set dari request
         // estimatedCost akan diupdate otomatis saat resep disimpan
 
@@ -91,6 +101,7 @@ public class ProductService {
         product.setType(request.getType());
         product.setCategory(category);
         product.setUnit(units);
+        product.setCreatedBy(authUtil.getCurrentUserEmail());
         // targetMargin & defaultPrice tidak diupdate dari request
 
         productRepository.save(product);
@@ -104,16 +115,17 @@ public class ProductService {
     }
 
     public RecipeResponse saveRecipe(UUID productId, RecipeRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
         ProductEntity product = findProductById(productId);
 
         // Nonaktifkan resep aktif sebelumnya
-        recipeRepository.findByProductIdAndIsActiveTrue(productId)
+        recipeRepository.findByProductIdAndTenantIdAndIsActiveTrue(productId, tenantId)
                 .ifPresent(activeRecipe -> {
                     activeRecipe.setActive(false);
                     recipeRepository.save(activeRecipe);
                 });
 
-        int newVersion = recipeRepository.countByProductId(productId) + 1;
+        int newVersion = recipeRepository.countByProductIdAndTenantId(productId, tenantId) + 1;
 
         // Ambil yield unit jika ada
         UnitsEntity yieldUnit = product.getUnit();
@@ -125,6 +137,7 @@ public class ProductService {
         recipe.setNotes(request.getNotes());
         recipe.setEstimatedYield(request.getEstimatedYield());
         recipe.setYieldUnit(yieldUnit);
+        recipe.setTenant(tenantRepository.getReferenceById(tenantId));
         recipeRepository.save(recipe);
 
         // Simpan items & hitung estimasi cost
@@ -145,6 +158,7 @@ public class ProductService {
             item.setIngredients(ingredient);
             item.setQuantity(itemRequest.getQuantity());
             item.setUnits(recipeUnit);
+            item.setTenant(tenantRepository.getReferenceById(tenantId));
             items.add(item);
 
             // Konversi qty resep ke unit stok untuk hitung cost
@@ -175,13 +189,14 @@ public class ProductService {
     }
 
     public List<RecipeResponse> getRecipes(UUID productId) {
+        UUID tenantId = TenantContext.getTenantId();
         findProductById(productId);
 
-        return recipeRepository.findByProductIdAndIsDeletedFalse(productId)
+        return recipeRepository.findByProductIdAndTenantIdAndIsDeletedFalse(productId, tenantId)
                 .stream()
                 .map(recipe -> {
                     List<ProductRecipeItemEntity> items =
-                            recipeItemRepository.findByRecipesIdAndIsDeletedFalse(recipe.getId());
+                            recipeItemRepository.findByRecipesIdAndTenantIdAndIsDeletedFalse(recipe.getId(), tenantId);
                     BigDecimal cost = calculateCost(items);
                     return toRecipeResponse(recipe, items, cost);
                 })
@@ -189,10 +204,11 @@ public class ProductService {
     }
 
     public RecipeResponse activeRecipe(UUID productId, UUID recipeId) {
+        UUID tenantId = TenantContext.getTenantId();
         findProductById(productId);
 
         // Nonaktifkan resep aktif sebelumnya
-        recipeRepository.findByProductIdAndIsActiveTrue(productId)
+        recipeRepository.findByProductIdAndTenantIdAndIsActiveTrue(productId, tenantId)
                 .ifPresent(activeRecipe -> {
                     activeRecipe.setActive(false);
                     recipeRepository.save(activeRecipe);
@@ -205,7 +221,7 @@ public class ProductService {
         recipeRepository.save(recipe);
 
         List<ProductRecipeItemEntity> items =
-                recipeItemRepository.findByRecipesIdAndIsDeletedFalse(recipeId);
+                recipeItemRepository.findByRecipesIdAndTenantIdAndIsDeletedFalse(recipeId, tenantId);
         BigDecimal cost = calculateCost(items);
 
         ProductEntity product = findProductById(productId);
@@ -298,6 +314,7 @@ public class ProductService {
                                 .ingredientId(item.getIngredients().getId())
                                 .ingredientName(item.getIngredients().getName())
                                 .unitSymbol(item.getUnits().getSymbol())
+                                .unitName(item.getUnits().getName())
                                 .unitId(item.getUnits().getId())
                                 .quantity(item.getQuantity())
                                 .build())

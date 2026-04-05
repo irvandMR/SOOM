@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trash2, Plus, Pencil } from 'lucide-react'
-import api from '../services/api'
-import { toast } from '../store/useToastStore'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
@@ -10,56 +8,61 @@ import StatusBadge from '../components/common/ui/StatusBadge'
 import FilterBar from '../components/common/ui/FilterBar'
 import AddModalIngredient from '../components/ingredient/addModalIngredient'
 import StockInModalIngredient from '../components/ingredient/stockInModalIngredient'
-import type { Ingredient } from '../types/ingredient.types'
 import EditModalIngredient from '../components/ingredient/editModalIngredient'
 import { formatRupiah } from '../utils/format'
+import type { Ingredient } from '../types/ingredient.types'
+import {
+  useIngredients,
+  useDeleteIngredient,
+  INGREDIENT_KEYS,
+} from '../hooks/queries/useIngredientQueries'
+import { useCategories } from '../hooks/queries/useCategoryQueries'
+import { useUnits } from '../hooks/queries/useUnitQueries'
+import { useQueryClient } from '@tanstack/react-query'
 
-interface Category { id: string; name: string }
-interface Unit { id: string; name: string; symbol: string, baseUnit: string }
+interface Category { id: string; name: string; type?: string }
 
 export default function IngredientPage() {
-  const [ingredients, setIngredients] = useState<Ingredient[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('ALL')
-  const [filterCategory, setFilterCategory] = useState('ALL')
-  const [first, setFirst] = useState(0)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showStockInModal, setShowStockInModal] = useState(false)
-  const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
+  const queryClient = useQueryClient()
 
-  const fetchIngredients = async () => {
-    const res = await api.get('/ingredients')
-    setIngredients(res.data.data)
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'name',
+    sortOrder: 1 as 1 | -1 | 0 | null,
+    search: '',
+    filterStatus: 'ALL',
+    filterCategory: 'ALL'
+  })
+
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: pageData, isLoading } = useIngredients({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`
+  })
+
+  const { data: catData } = useCategories({ size: 100 })
+  const { data: unitData } = useUnits({ size: 100 })
+  const deleteIngredient = useDeleteIngredient()
+
+  const ingredients = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
+
+  const categories = (catData?.content || []).filter((c: Category) => c?.type === 'INGREDIENT')
+  const units = unitData?.content || []
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
   }
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [ingRes, catRes, unitRes] = await Promise.all([
-          api.get('/ingredients'),
-          api.get('/categories'),
-          api.get('/units'),
-        ])
-        setIngredients(ingRes.data.data)
-        setCategories(catRes.data.data.filter((c: any) => c?.type === 'INGREDIENT'))
-        setUnits(unitRes.data.data)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchAll()
-  }, [])
-
-  // Reset ke halaman 1 setiap kali filter berubah
-  useEffect(() => {
-    setFirst(0)
-  }, [search, filterStatus, filterCategory])
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
 
   const handleDelete = (id: string) => {
     confirmDialog({
@@ -69,56 +72,36 @@ export default function IngredientPage() {
       acceptClassName: 'p-button-danger',
       acceptLabel: 'Hapus',
       rejectLabel: 'Batal',
-      accept: async () => {
-        try {
-          await api.delete(`/ingredients/${id}`)
-          await fetchIngredients()
-          toast.success('Berhasil', 'Bahan baku berhasil dihapus')
-        } catch (err: any) {
-          toast.error('Gagal', err.response?.data?.message ?? 'Gagal menghapus')
-        }
-      },
+      accept: () => deleteIngredient.mutate(id),
     })
   }
 
-  const filteredIngredients = ingredients.filter(i => {
-    const matchSearch = i.name.toLowerCase().includes(search.toLowerCase())
-    const isCritical = i.stockQuantity <= i.minimumStock
-    const matchStatus =
-      filterStatus === 'ALL' ||
-      (filterStatus === 'CRITICAL' && isCritical) ||
-      (filterStatus === 'SAFE' && !isCritical)
-    const matchCategory =
-      filterCategory === 'ALL' || i.categoryName === filterCategory
-    return matchSearch && matchStatus && matchCategory
-  })
+  const refresh = () => queryClient.invalidateQueries({ queryKey: INGREDIENT_KEYS.lists() })
 
   const columns = [
-    { header: 'Nama', field: 'name' },
+    { header: 'Nama', field: 'name', sortable: true },
     {
-      header: 'Kategori', body: (row: Ingredient) => (
+      header: 'Kategori', field: 'category.name', sortable: true, body: (row: Ingredient) => (
         <span style={{ color: 'var(--muted)', fontSize: 12 }}>{row.categoryName}</span>
       )
     },
     {
-      header: 'Stok', body: (row: Ingredient) => (
+      header: 'Stok', field: 'stockQuantity', sortable: true, body: (row: Ingredient) => (
         <span style={{ fontWeight: 500 }}>{row.stockQuantity} {row.unitSymbol}</span>
       )
     },
     {
-      header: 'Min. Stok', body: (row: Ingredient) => (
+      header: 'Min. Stok', field: 'minimumStock', sortable: true, body: (row: Ingredient) => (
         <span style={{ color: 'var(--muted)', fontSize: 12 }}>{row.minimumStock} {row.unitSymbol}</span>
       )
     },
     {
-      header: 'Harga', body: (row: Ingredient) => (
-        <span style={{ fontSize: 12 }}>
-          {formatRupiah(row.purchasePrice)} / {row.unitSymbol}
-        </span>
+      header: 'Harga', field: 'purchasePrice', sortable: true, body: (row: Ingredient) => (
+        <span style={{ fontSize: 12 }}>{formatRupiah(row.purchasePrice)} / {row.unitSymbol}</span>
       )
     },
     {
-      header: 'Harga Rata-rata', body: (row: Ingredient) => (
+      header: 'Harga Rata-rata', field: 'avgPurchasePrice', sortable: true, body: (row: Ingredient) => (
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>
           {formatRupiah(row.avgPurchasePrice)} / {row.unitSymbol}
         </span>
@@ -132,7 +115,6 @@ export default function IngredientPage() {
     {
       header: 'Aksi', body: (row: Ingredient) => (
         <div style={{ display: 'flex', gap: 6 }}>
-          {/* Tombol Edit hanya muncul jika stock sudah ada */}
           {row.stockQuantity > 0 && (
             <Button
               label="Edit"
@@ -164,35 +146,40 @@ export default function IngredientPage() {
     },
   ]
 
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showStockInModal, setShowStockInModal] = useState(false)
+  const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null)
+
   return (
     <div>
       <PageHeader
         title="Stok Bahan Baku"
-        subtitle={`${filteredIngredients.length} bahan baku terdaftar`}
+        subtitle={`${totalRecords} bahan baku terdaftar`}
         actionLabel="Tambah Bahan Baku"
         onAction={() => setShowAddModal(true)}
       />
 
       <FilterBar
         config={{
-          search: {
-            value: search,
-            onChange: setSearch,
-            placeholder: 'Cari nama bahan baku...',
+          search: { 
+            value: lazyParams.search, 
+            onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })), 
+            placeholder: 'Cari nama bahan baku...' 
           },
           dropdowns: [
             {
-              value: filterCategory,
-              onChange: setFilterCategory,
+              value: lazyParams.filterCategory,
+              onChange: (v) => setLazyParams(p => ({ ...p, filterCategory: v, page: 0, first: 0 })),
               options: [
                 { label: 'Semua Kategori', value: 'ALL' },
-                ...categories.map(c => ({ label: c.name, value: c.name })),
+                ...(categories as Category[]).map(c => ({ label: c.name, value: c.name })),
               ],
               placeholder: 'Kategori',
             },
             {
-              value: filterStatus,
-              onChange: setFilterStatus,
+              value: lazyParams.filterStatus,
+              onChange: (v) => setLazyParams(p => ({ ...p, filterStatus: v, page: 0, first: 0 })),
               options: [
                 { label: 'Semua Status', value: 'ALL' },
                 { label: 'Aman', value: 'SAFE' },
@@ -202,41 +189,47 @@ export default function IngredientPage() {
             },
           ],
         }}
-        onReset={() => { setSearch(''); setFilterStatus('ALL'); setFilterCategory('ALL') }}
-        hasActiveFilter={!!(search || filterStatus !== 'ALL' || filterCategory !== 'ALL')}
-        onRefresh={fetchIngredients}
+        onReset={() => setLazyParams(p => ({ ...p, search: '', filterStatus: 'ALL', filterCategory: 'ALL', page: 0, first: 0 }))}
+        hasActiveFilter={!!(lazyParams.search || lazyParams.filterStatus !== 'ALL' || lazyParams.filterCategory !== 'ALL')}
+        onRefresh={refresh}
       />
 
       <Table
-        data={filteredIngredients}
+        data={ingredients}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         emptyMessage="Belum ada bahan baku"
-        first={first}
-        onFirstChange={setFirst}
+        lazy
+        totalRecords={totalRecords}
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
       />
 
       <AddModalIngredient
         visible={showAddModal}
         onHide={() => setShowAddModal(false)}
-        onSuccess={fetchIngredients}
-        categories={categories}
-        units={units}
+        onSuccess={refresh}
+        categories={categories as any}
+        units={units as any}
       />
 
       <EditModalIngredient
         visible={showEditModal}
         onHide={() => setShowEditModal(false)}
-        onSuccess={fetchIngredients}
-        categories={categories}
-        units={units}
+        onSuccess={refresh}
+        categories={categories as any}
+        units={units as any}
         ingredient={selectedIngredient}
       />
 
       <StockInModalIngredient
         visible={showStockInModal}
         onHide={() => setShowStockInModal(false)}
-        onSuccess={fetchIngredients}
+        onSuccess={refresh}
         ingredient={selectedIngredient}
       />
     </div>

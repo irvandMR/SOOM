@@ -1,8 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Eye, Trash2 } from 'lucide-react'
-import api from '../services/api'
-import { toast } from '../store/useToastStore'
-import { confirmDialog } from '../components/common/ui/ConfirmDialog'
+import { useState } from 'react'
+import { Eye } from 'lucide-react'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
 import Button from '../components/common/ui/Button'
@@ -14,149 +11,100 @@ import UpdateStatusModalOrder from '../components/order/updateStatusModalOrder'
 import AddPaymentModalOrder from '../components/order/addPaymentModalOrder'
 import { formatRupiah, formatDate } from '../utils/format'
 import type { Order, OrderDetail } from '../types/order.types'
-
-// ← update interface Product — hapus defaultPrice, tambah type
-interface Product {
-  id: string
-  name: string
-  type: string   // MADE_TO_ORDER | MADE_TO_STOCK | RESELL
-}
+import { useOrders, useOrderDetail, ORDER_KEYS } from '../hooks/queries/useOrderQueries'
+import { useProducts } from '../hooks/queries/useProductQueries'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function OrderPage() {
-  const [orders, setOrders] = useState<Order[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const queryClient = useQueryClient()
 
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'orderDate',
+    sortOrder: -1 as 1 | -1 | 0 | null,
+    search: '',
+    status: 'ALL',
+    paymentStatus: 'ALL',
+    dateRange: [null, null] as [Date | null, Date | null]
+  })
+
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('ALL')
-  const [filterPaymentStatus, setFilterPaymentStatus] = useState('ALL')
-  const [filterDateRange, setFilterDateRange] = useState<[Date | null, Date | null]>([null, null])
-  const [first, setFirst] = useState(0)
-
-  const fetchOrders = async () => {
-    const res = await api.get('/orders')
-    setOrders(res.data.data)
-  }
-
-  const fetchDetail = async (id: string) => {
-    setDetailLoading(true)
-    try {
-      const res = await api.get(`/orders/${id}`)
-      setSelectedOrder(res.data.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setDetailLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [ordersRes, productsRes] = await Promise.all([
-          api.get('/orders'),
-          api.get('/products'),
-        ])
-        setOrders(ordersRes.data.data)
-        // Filter hanya MADE_TO_ORDER & MADE_TO_STOCK — RESELL tidak perlu produksi
-        setProducts(productsRes.data.data.filter(
-          (p: Product) => p.type !== 'RESELL'
-        ))
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchAll()
-  }, [])
-
-  useEffect(() => {
-    setFirst(0)
-  }, [search, filterStatus, filterPaymentStatus, filterDateRange])
-
-  const handleDelete = (id: string) => {
-    confirmDialog({
-      message: 'Order ini akan dihapus permanen.',
-      header: 'Hapus Order?',
-      icon: 'pi pi-trash',
-      acceptClassName: 'p-button-danger',
-      acceptLabel: 'Hapus',
-      rejectLabel: 'Batal',
-      accept: async () => {
-        try {
-          await api.delete(`/orders/${id}`)
-          await fetchOrders()
-          toast.success('Berhasil', 'Order berhasil dihapus')
-        } catch (err: any) {
-          toast.error('Gagal', 'Gagal menghapus')
-        }
-      },
-    })
-  }
-
-  const handleSuccessStatus = async () => {
-    if (selectedOrder) await fetchDetail(selectedOrder.id)
-    await fetchOrders()
-  }
-
-  const handleSuccessPayment = async () => {
-    if (selectedOrder) await fetchDetail(selectedOrder.id)
-    await fetchOrders()
-  }
-
-  const filteredOrders = orders.filter(o => {
-    const matchSearch =
-      o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      o.orderNumber.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = filterStatus === 'ALL' || o.status === filterStatus
-    const matchPayment = filterPaymentStatus === 'ALL' || o.paymentStatus === filterPaymentStatus
-    const matchDate = (() => {
-      if (!filterDateRange?.[0]) return true
-      const orderDate = new Date(o.orderDate)
-      orderDate.setHours(0, 0, 0, 0)
-      const start = new Date(filterDateRange[0]!)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(filterDateRange[1] ?? filterDateRange[0]!)
-      end.setHours(23, 59, 59, 999)
-      return orderDate >= start && orderDate <= end
-    })()
-    return matchSearch && matchStatus && matchPayment && matchDate
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: pageData, isLoading } = useOrders({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`,
+    status: lazyParams.status,
+    paymentStatus: lazyParams.paymentStatus
   })
+
+  const { data: allProducts = [] } = useProducts({ page: 0, size: 1000 })
+  const products = (allProducts as any)?.content?.filter((p: any) => p.type !== 'RESELL') || []
+
+  // Fetch detail hanya saat modal aktif & ada id yang dipilih
+  const { data: selectedOrder, isLoading: detailLoading } = useOrderDetail(
+    (showDetailModal || showStatusModal || showPaymentModal) ? selectedOrderId : null
+  )
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
+  }
+
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
+
+  const handleOpenDetail = (id: string) => {
+    setSelectedOrderId(id)
+    setShowDetailModal(true)
+  }
+
+  const refreshDetail = () => {
+    if (selectedOrderId) {
+      queryClient.invalidateQueries({ queryKey: ORDER_KEYS.detail(selectedOrderId) })
+      queryClient.invalidateQueries({ queryKey: ORDER_KEYS.lists() })
+    }
+  }
+
+  const orders = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
 
   const columns = [
     {
-      header: 'No. Order', body: (row: Order) => (
+      header: 'No. Order', field: 'orderNumber', sortable: true, body: (row: Order) => (
         <span style={{ fontWeight: 500, color: 'var(--accent)', fontSize: 12 }}>{row.orderNumber}</span>
       )
     },
-    { header: 'Customer', field: 'customerName' },
+    { header: 'Customer', field: 'customerName', sortable: true },
     {
-      header: 'Tgl Order', body: (row: Order) => (
+      header: 'Tgl Order', field: 'orderDate', sortable: true, body: (row: Order) => (
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDate(row.orderDate)}</span>
       )
     },
     {
-      header: 'Tgl Dibutuhkan', body: (row: Order) => (
+      header: 'Tgl Dibutuhkan', field: 'requiredDate', sortable: true, body: (row: Order) => (
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>
           {row.requiredDate ? formatDate(row.requiredDate) : '-'}
         </span>
       )
     },
     {
-      header: 'Total', body: (row: Order) => (
+      header: 'Total', field: 'totalAmount', sortable: true, body: (row: Order) => (
         <span style={{ fontWeight: 500 }}>{formatRupiah(row.totalAmount)}</span>
       )
     },
-    { header: 'Status', body: (row: Order) => <StatusBadge status={row.status} /> },
-    { header: 'Pembayaran', body: (row: Order) => <StatusBadge status={row.paymentStatus} /> },
+    { header: 'Status', field: 'status', sortable: true, body: (row: Order) => <StatusBadge status={row.status} /> },
+    { header: 'Pembayaran', field: 'paymentStatus', sortable: true, body: (row: Order) => <StatusBadge status={row.paymentStatus} /> },
     {
       header: 'Aksi', body: (row: Order) => (
         <div style={{ display: 'flex', gap: 6 }}>
@@ -166,15 +114,7 @@ export default function OrderPage() {
             variant="secondary"
             size="small"
             tooltip="Lihat Detail"
-            onClick={() => { fetchDetail(row.id); setShowDetailModal(true) }}
-          />
-          <Button
-            label="Hapus"
-            icon={<Trash2 size={12} />}
-            variant="danger"
-            size="small"
-            tooltip="Hapus"
-            onClick={() => handleDelete(row.id)}
+            onClick={() => handleOpenDetail(row.id)}
           />
         </div>
       )
@@ -185,23 +125,27 @@ export default function OrderPage() {
     <div>
       <PageHeader
         title="Order"
-        subtitle={`${filteredOrders.length} order ditampilkan`}
+        subtitle={`${totalRecords} order terdaftar`}
         actionLabel="Buat Order"
         onAction={() => setShowCreateModal(true)}
       />
 
       <FilterBar
         config={{
-          search: { value: search, onChange: setSearch, placeholder: 'Cari customer atau no. order...' },
+          search: { 
+            value: lazyParams.search, 
+            onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })), 
+            placeholder: 'Cari customer atau no. order...' 
+          },
           dateRange: {
-            value: filterDateRange,
-            onChange: (val) => setFilterDateRange(val ?? [null, null]),
+            value: lazyParams.dateRange,
+            onChange: (val) => setLazyParams(p => ({ ...p, dateRange: val ?? [null, null], page: 0, first: 0 })),
             placeholder: 'Filter tanggal'
           },
           dropdowns: [
             {
-              value: filterStatus,
-              onChange: setFilterStatus,
+              value: lazyParams.status,
+              onChange: (v) => setLazyParams(p => ({ ...p, status: v, page: 0, first: 0 })),
               options: [
                 { label: 'Semua Status', value: 'ALL' },
                 { label: 'Pending', value: 'PENDING' },
@@ -213,8 +157,8 @@ export default function OrderPage() {
               placeholder: 'Status Order',
             },
             {
-              value: filterPaymentStatus,
-              onChange: setFilterPaymentStatus,
+              value: lazyParams.paymentStatus,
+              onChange: (v) => setLazyParams(p => ({ ...p, paymentStatus: v, page: 0, first: 0 })),
               options: [
                 { label: 'Semua Pembayaran', value: 'ALL' },
                 { label: 'Belum Bayar', value: 'UNPAID' },
@@ -225,36 +169,37 @@ export default function OrderPage() {
             },
           ],
         }}
-        onReset={() => {
-          setSearch('')
-          setFilterStatus('ALL')
-          setFilterPaymentStatus('ALL')
-          setFilterDateRange([null, null])
-        }}
-        hasActiveFilter={!!(search || filterStatus !== 'ALL' || filterPaymentStatus !== 'ALL' || filterDateRange[0])}
-        onRefresh={fetchOrders}
+        onReset={() => setLazyParams(p => ({ ...p, search: '', status: 'ALL', paymentStatus: 'ALL', dateRange: [null, null], page: 0, first: 0 }))}
+        hasActiveFilter={!!(lazyParams.search || lazyParams.status !== 'ALL' || lazyParams.paymentStatus !== 'ALL' || lazyParams.dateRange?.[0])}
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ORDER_KEYS.lists() })}
       />
 
       <Table
-        data={filteredOrders}
+        data={orders}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         emptyMessage="Belum ada order"
-        first={first}
-        onFirstChange={setFirst}
+        lazy
+        totalRecords={totalRecords}
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
       />
 
       <CreateModalOrder
         visible={showCreateModal}
         onHide={() => setShowCreateModal(false)}
-        onSuccess={fetchOrders}
-        products={products}   // ← sekarang sudah include type, tanpa defaultPrice
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ORDER_KEYS.lists() })}
+        products={products}
       />
 
       <DetailModalOrder
         visible={showDetailModal}
-        onHide={() => { setShowDetailModal(false); setSelectedOrder(null) }}
-        order={selectedOrder}
+        onHide={() => { setShowDetailModal(false); setSelectedOrderId(null) }}
+        order={(selectedOrder as OrderDetail) ?? null}
         loading={detailLoading}
         onUpdateStatus={() => setShowStatusModal(true)}
         onAddPayment={() => setShowPaymentModal(true)}
@@ -263,15 +208,15 @@ export default function OrderPage() {
       <UpdateStatusModalOrder
         visible={showStatusModal}
         onHide={() => setShowStatusModal(false)}
-        onSuccess={handleSuccessStatus}
-        order={selectedOrder}
+        onSuccess={refreshDetail}
+        order={(selectedOrder as OrderDetail) ?? null}
       />
 
       <AddPaymentModalOrder
         visible={showPaymentModal}
         onHide={() => setShowPaymentModal(false)}
-        onSuccess={handleSuccessPayment}
-        order={selectedOrder}
+        onSuccess={refreshDetail}
+        order={(selectedOrder as OrderDetail) ?? null}
       />
     </div>
   )

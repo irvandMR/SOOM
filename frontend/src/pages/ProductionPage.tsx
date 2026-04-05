@@ -1,101 +1,93 @@
-import { useEffect, useState } from 'react'
-import api from '../services/api'
+import { useState } from 'react'
+import { Eye } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Production } from '../types/production.types'
 import { formatDate } from '../utils/format'
 import PageHeader from '../components/common/ui/PageHeader'
 import Table from '../components/common/ui/Table'
 import StatusBadge from '../components/common/ui/StatusBadge'
 import FilterBar from '../components/common/ui/FilterBar'
-import DetailProductionModal from '../components/production/DetailProductionModal'
 import Button from '../components/common/ui/Button'
-import { Eye } from 'lucide-react'
-import AddProductionModal from '../components/production/addProductionModal'
+import DetailProductionModal from '../components/production/DetailProductionModal'
+import AddProductionModal from '../components/production/AddProductionModal'
+import { useProductions, PRODUCTION_KEYS } from '../hooks/queries/useProductionQueries'
+import { useProducts } from '../hooks/queries/useProductQueries'
 
 interface Product {
   id: string
   name: string
-  unitName: string    // ← tambah
-  unitSymbol: string  // ← tambah
+  unitName: string
+  unitSymbol: string
 }
 
 export default function ProductionPage() {
-  const [productions, setProductions] = useState<Production[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  // ── UI State ──────────────────────────────────────────────────────────────
+  const [lazyParams, setLazyParams] = useState({
+    first: 0,
+    rows: 10,
+    page: 0,
+    sortField: 'productionDate',
+    sortOrder: -1 as 1 | -1 | 0 | null,
+    search: '',
+    filterStatus: 'ALL',
+    filterDateRange: [null, null] as [Date | null, Date | null]
+  })
+
   const [showModal, setShowModal] = useState(false)
-
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('ALL')
-  const [filterDateRange, setFilterDateRange] = useState<[Date | null, Date | null]>([null, null])
-  const [first, setFirst] = useState(0)
-
   const [selectedProductionId, setSelectedProductionId] = useState<string | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
 
-  const fetchProductions = async () => {
-    const res = await api.get('/productions')
-    setProductions(res.data.data)
+  // ── React Query ───────────────────────────────────────────────────────────
+  const { data: productData } = useProducts({ page: 0, size: 1000 })
+  const products = (productData as any)?.content || []
+  const hasProducts = products.length > 0
+
+  const { data: pageData, isLoading } = useProductions({
+    page: lazyParams.page,
+    size: lazyParams.rows,
+    search: lazyParams.search || undefined,
+    sort: `${lazyParams.sortField},${lazyParams.sortOrder === 1 ? 'asc' : 'desc'}`
+  }, hasProducts)
+
+  const productions = pageData?.content || []
+  const totalRecords = pageData?.totalElements || 0
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: PRODUCTION_KEYS.lists() })
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const onPage = (event: any) => {
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
   }
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [prodRes, productRes] = await Promise.all([  // ← tambah unitRes
-          api.get('/productions'),
-          api.get('/products'),
-          api.get('/units'),                                          // ← tambah
-        ])
-        setProductions(prodRes.data.data)
-        setProducts(productRes.data.data)                                 // ← tambah
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchAll()
-  }, [])
-
-  useEffect(() => {
-    setFirst(0)
-  }, [search, filterStatus, filterDateRange])
-
-  const filteredProductions = productions.filter(p => {
-    const matchSearch = p.productName.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = filterStatus === 'ALL' || p.status === filterStatus
-    const matchDate = (() => {
-      if (!filterDateRange?.[0]) return true
-      const date = new Date(p.productionDate)
-      date.setHours(0, 0, 0, 0)
-      const start = new Date(filterDateRange[0]!)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(filterDateRange[1] ?? filterDateRange[0]!)
-      end.setHours(23, 59, 59, 999)
-      return date >= start && date <= end
-    })()
-    return matchSearch && matchStatus && matchDate
-  })
+  const onSort = (event: any) => {
+    setLazyParams(prev => ({ ...prev, sortField: event.sortField, sortOrder: event.sortOrder }))
+  }
 
   const columns = [
-    { header: 'Produk', field: 'productName' },
+    { header: 'Produk', field: 'product.name', sortable: true, body: (row: Production) => row.productName },
     {
       header: 'Versi Resep', body: (row: Production) => (
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>Versi {row.recipeVersion}</span>
       )
     },
     {
-      header: 'Qty Produksi', body: (row: Production) => (
-        <span style={{ fontWeight: 500 }}>
-          {row.quantityProduced} {row.unitSymbol ?? ''}
-        </span>
+      header: 'Qty Produksi', field: 'quantityProduced', sortable: true, body: (row: Production) => (
+        <span style={{ fontWeight: 500 }}>{row.quantityProduced} {row.unitSymbol ?? ''}</span>
       )
     },
     {
-      header: 'Tgl Produksi', body: (row: Production) => (
+      header: 'Tgl Produksi', field: 'productionDate', sortable: true, body: (row: Production) => (
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDate(row.productionDate)}</span>
       )
     },
-    { header: 'Status', body: (row: Production) => <StatusBadge status={row.status} /> },
+    {
+      header: 'Tgl Expired', field: 'expiredDate', sortable: true, body: (row: Production) => (
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDate(row.expiredDate)}</span>
+      )
+    },
+    { header: 'Status', field: 'status', sortable: true, body: (row: Production) => <StatusBadge status={row.status} /> },
     {
       header: 'Catatan', body: (row: Production) => (
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{row.notes || '-'}</span>
@@ -111,29 +103,33 @@ export default function ProductionPage() {
           onClick={() => { setSelectedProductionId(row.id); setShowDetailModal(true) }}
         />
       )
-    }
+    },
   ]
 
   return (
     <div>
       <PageHeader
         title="Produksi"
-        subtitle={`${filteredProductions.length} produksi tercatat`}
+        subtitle={`${totalRecords} produksi tercatat`}
         actionLabel="Catat Produksi"
         onAction={() => setShowModal(true)}
       />
 
       <FilterBar
         config={{
-          search: { value: search, onChange: setSearch, placeholder: 'Cari nama produk...' },
+          search: { 
+            value: lazyParams.search, 
+            onChange: (v) => setLazyParams(p => ({ ...p, search: v, page: 0, first: 0 })), 
+            placeholder: 'Cari nama produk...' 
+          },
           dateRange: {
-            value: filterDateRange,
-            onChange: (val) => setFilterDateRange(val ?? [null, null]),
+            value: lazyParams.filterDateRange,
+            onChange: (val) => setLazyParams(p => ({ ...p, filterDateRange: val ?? [null, null], page: 0, first: 0 })),
             placeholder: 'Filter tanggal'
           },
           dropdowns: [{
-            value: filterStatus,
-            onChange: setFilterStatus,
+            value: lazyParams.filterStatus,
+            onChange: (v) => setLazyParams(p => ({ ...p, filterStatus: v, page: 0, first: 0 })),
             options: [
               { label: 'Semua Status', value: 'ALL' },
               { label: 'Sukses', value: 'SUCCESS' },
@@ -142,25 +138,31 @@ export default function ProductionPage() {
             placeholder: 'Status',
           }],
         }}
-        onReset={() => { setSearch(''); setFilterStatus('ALL'); setFilterDateRange([null, null]) }}
-        hasActiveFilter={!!(search || filterStatus !== 'ALL' || filterDateRange[0])}
-        onRefresh={fetchProductions}
+        onReset={() => setLazyParams(p => ({ ...p, search: '', filterStatus: 'ALL', filterDateRange: [null, null], page: 0, first: 0 }))}
+        hasActiveFilter={!!(lazyParams.search || lazyParams.filterStatus !== 'ALL' || lazyParams.filterDateRange?.[0])}
+        onRefresh={refresh}
       />
 
       <Table
-        data={filteredProductions}
+        data={productions}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         emptyMessage="Belum ada data produksi"
-        first={first}
-        onFirstChange={setFirst}
+        lazy
+        totalRecords={totalRecords}
+        first={lazyParams.first}
+        rows={lazyParams.rows}
+        onPage={onPage}
+        onSort={onSort}
+        sortField={lazyParams.sortField}
+        sortOrder={lazyParams.sortOrder}
       />
 
       <AddProductionModal
         visible={showModal}
         onHide={() => setShowModal(false)}
-        onSuccess={fetchProductions}
-        products={products}   
+        onSuccess={refresh}
+        products={products as Product[]}
       />
 
       <DetailProductionModal

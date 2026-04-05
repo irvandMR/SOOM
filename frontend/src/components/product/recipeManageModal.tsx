@@ -116,8 +116,8 @@ export default function RecipeManageModal({
 
     let qtyInStockUnit = item.quantity ?? 0
     if (recipeUnit.id !== stockUnit.id &&
-        recipeUnit.conversionFactor != null &&
-        stockUnit.conversionFactor != null) {
+      recipeUnit.conversionFactor != null &&
+      stockUnit.conversionFactor != null) {
       const inBase = qtyInStockUnit * recipeUnit.conversionFactor
       qtyInStockUnit = inBase / stockUnit.conversionFactor
     }
@@ -227,7 +227,13 @@ export default function RecipeManageModal({
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 12px' }}>
                   {activeRecipe.items.map(item => (
                     <span key={item.id} style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      {item.ingredientName} {item.quantity}{item.unitSymbol}
+                      {item.ingredientName} {item.quantity}{
+                        (item.unitSymbol === 'sdm' || item.unitSymbol === 'sdt') && item.unitName
+                          ? (item.unitName.toLowerCase().includes('kering') || item.unitName.toLowerCase().includes('mass') 
+                              ? ` ${item.unitSymbol} (mass)` 
+                              : ` ${item.unitSymbol} (vol)`)
+                          : ` ${item.unitSymbol}`
+                      }
                     </span>
                   ))}
                 </div>
@@ -273,12 +279,35 @@ export default function RecipeManageModal({
 
             {recipeForm.items.map((item, i) => {
               const selectedIng = ingredients.find(ing => ing.id === item.ingredientId)
-
               const compatibleUnits = units.filter(u => {
                 if (!selectedIng) return true
                 const ingUnit = units.find(unit => unit.id === selectedIng.unitId)
-                if (!ingUnit?.baseUnit) return true
-                return u.baseUnit === ingUnit.baseUnit
+                if (!ingUnit) return true
+
+                const massFamilies = ['g', 'mass']
+                const volumeFamilies = ['ml', 'volume']
+
+                const ingSymbol = ingUnit.symbol.toLowerCase()
+                const uSymbol = u.symbol.toLowerCase()
+
+                // Tentukan keluarga unit bahan baku
+                const ingBase = ingUnit.baseUnit?.toLowerCase() || ''
+                const isIngMass = massFamilies.includes(ingBase) || ['kg', 'g', 'mg'].includes(ingSymbol)
+                const isIngVolume = volumeFamilies.includes(ingBase) || ['l', 'ml'].includes(ingSymbol)
+
+                // Tentukan keluarga unit option (u)
+                const uBase = u.baseUnit?.toLowerCase() || ''
+                const isUMass = massFamilies.includes(uBase) || ['kg', 'g', 'mg'].includes(uSymbol)
+                const isUVolume = volumeFamilies.includes(uBase) || ['l', 'ml'].includes(uSymbol)
+
+                if (isIngMass && isUMass) return true
+                if (isIngVolume && isUVolume) return true
+
+                // Fallback default baseUnit match
+                if (ingUnit.baseUnit && u.baseUnit === ingUnit.baseUnit) return true
+
+                // Default
+                return u.id === ingUnit.id
               })
 
               return (

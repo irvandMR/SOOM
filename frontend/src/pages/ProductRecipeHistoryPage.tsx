@@ -11,9 +11,7 @@ interface Product {
   name: string
   categoryName: string
   unitName: string
-  defaultPrice: number
   estimatedCost: number
-  targetMargin: number
 }
 
 export default function ProductRecipeHistoryPage() {
@@ -52,9 +50,6 @@ export default function ProductRecipeHistoryPage() {
   }
 
   const activeRecipe = recipes.find(r => r.isActive)
-  const recommendedPrice = product
-    ? product.estimatedCost * (1 + product.targetMargin / 100)
-    : 0
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
@@ -157,10 +152,9 @@ export default function ProductRecipeHistoryPage() {
                 {/* Bahan-bahan */}
                 <div style={{ background: 'var(--sidebar-bg)', borderRadius: 8, overflow: 'hidden' }}>
                   <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
                       <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Bahan</span>
                       <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Jumlah</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Est. Biaya</span>
                     </div>
                   </div>
                   {recipe.items.map((item, i) => (
@@ -168,12 +162,17 @@ export default function ProductRecipeHistoryPage() {
                       padding: '8px 12px',
                       borderBottom: i < recipe.items.length - 1 ? '1px solid var(--border)' : 'none',
                     }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
                         <span style={{ fontSize: 13, color: 'var(--text)' }}>{item.ingredientName}</span>
                         <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 80, textAlign: 'right' }}>
-                          {item.quantity} {item.unitSymbol}
+                          {item.quantity} {
+                            (item.unitSymbol === 'sdm' || item.unitSymbol === 'sdt') && item.unitName
+                              ? (item.unitName.toLowerCase().includes('kering') || item.unitName.toLowerCase().includes('mass') 
+                                  ? `${item.unitSymbol} (mass)` 
+                                  : `${item.unitSymbol} (vol)`)
+                              : item.unitSymbol
+                          }
                         </span>
-                        <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 90, textAlign: 'right' }}>-</span>
                       </div>
                     </div>
                   ))}
@@ -194,8 +193,6 @@ export default function ProductRecipeHistoryPage() {
             {[
               { label: 'Kategori', value: product.categoryName },
               { label: 'Unit', value: product.unitName },
-              { label: 'Harga Jual', value: formatRupiah(product.defaultPrice) },
-              { label: 'Target Margin', value: `${product.targetMargin}%` },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: 12, color: 'var(--muted)' }}>{label}</span>
@@ -212,13 +209,6 @@ export default function ProductRecipeHistoryPage() {
               </div>
               {[
                 { label: 'Est. Modal', value: formatRupiah(activeRecipe.estimatedCost), color: 'var(--text)' },
-                { label: 'Harga Jual', value: formatRupiah(product.defaultPrice), color: 'var(--accent)' },
-                { label: 'Rek. Harga', value: formatRupiah(recommendedPrice), color: '#2E7D32' },
-                {
-                  label: 'Est. Profit',
-                  value: formatRupiah(product.defaultPrice - activeRecipe.estimatedCost),
-                  color: product.defaultPrice > activeRecipe.estimatedCost ? '#2E7D32' : '#C62828',
-                },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ fontSize: 12, color: 'var(--muted)' }}>{label}</span>

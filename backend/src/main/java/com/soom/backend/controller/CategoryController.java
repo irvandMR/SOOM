@@ -3,9 +3,12 @@ package com.soom.backend.controller;
 import com.soom.backend.dto.request.CategoryRequest;
 import com.soom.backend.dto.response.BaseResponse;
 import com.soom.backend.dto.response.CategoryResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,11 +22,13 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<BaseResponse<List<CategoryResponse>>> getAll() {
-        return ResponseEntity.ok(BaseResponse.<List<CategoryResponse>>builder()
+    public ResponseEntity<BaseResponse<PageResponse<CategoryResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "name", direction = org.springframework.data.domain.Sort.Direction.ASC) Pageable pageable,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(BaseResponse.<PageResponse<CategoryResponse>>builder()
                 .success(true)
                 .message("OK")
-                .data(categoryService.getAll())
+                .data(categoryService.getAll(pageable, search))
                 .build());
     }
 

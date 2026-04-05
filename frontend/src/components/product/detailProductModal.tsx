@@ -86,7 +86,15 @@ export default function DetailProductModal({ visible, onHide, product, recipes, 
                 {activeRecipe.items.map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderTop: '1px solid var(--border)' }}>
                     <span>{item.ingredientName}</span>
-                    <span style={{ color: 'var(--muted)' }}>{item.quantity} {item.unitSymbol}</span>
+                    <span style={{ color: 'var(--muted)' }}>
+                      {item.quantity} {
+                        (item.unitSymbol === 'sdm' || item.unitSymbol === 'sdt') && item.unitName
+                          ? (item.unitName.toLowerCase().includes('kering') || item.unitName.toLowerCase().includes('mass') 
+                              ? `${item.unitSymbol} (mass)` 
+                              : `${item.unitSymbol} (vol)`)
+                          : item.unitSymbol
+                      }
+                    </span>
                   </div>
                 ))}
               </div>

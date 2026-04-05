@@ -2,6 +2,7 @@ package com.soom.backend.service;
 
 import com.soom.backend.dto.request.LoginRequest;
 import com.soom.backend.dto.response.AuthResponse;
+import com.soom.backend.dto.response.TenantResponse;
 import com.soom.backend.dto.response.UserResponse;
 import com.soom.backend.entity.RefreshTokenEntity;
 import com.soom.backend.entity.UserEntity;
@@ -62,12 +63,27 @@ public class AuthService {
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
+                .mustChangePassword(user.getMustChangePassword())
                 .user(UserResponse.builder()
                         .id(user.getId())
                         .name(user.getName())
                         .email(user.getEmail())
                         .role(user.getRole())
+                        .tenantRole(user.getTenantRole())
                         .build())
+                .tenant(user.getTenant() != null
+                        ? TenantResponse.builder()
+                        .id(user.getTenant().getId())
+                        .businessName(user.getTenant().getBusinessName())
+                        .address(user.getTenant().getAddress())
+                        .phone(user.getTenant().getPhone())
+                        .email(user.getTenant().getEmail())
+                        .bankName(user.getTenant().getBankName())
+                        .bankAccount(user.getTenant().getBankAccount())
+                        .bankAccountName(user.getTenant().getBankAccountName())
+                        .invoiceFooter(user.getTenant().getInvoiceFooter())
+                        .build()
+                        : null)
                 .build();
     }
 

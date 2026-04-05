@@ -1,10 +1,12 @@
 package com.soom.backend.service;
 
+import com.soom.backend.context.TenantContext;
 import com.soom.backend.dto.request.IngredientRequest;
 import com.soom.backend.dto.request.StockInRequest;
 import com.soom.backend.dto.request.UpdateIngredientRequest;
 import com.soom.backend.dto.response.IngredientResponse;
 import com.soom.backend.dto.response.IngredientHistoryResponse;
+import com.soom.backend.dto.response.PageResponse;
 import com.soom.backend.entity.*;
 import com.soom.backend.enums.CashFlowType;
 import com.soom.backend.enums.StockHistoryType;
@@ -12,6 +14,8 @@ import com.soom.backend.repository.*;
 import com.soom.backend.utils.AuthUtil;
 import com.soom.backend.utils.UnitConverter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -28,17 +32,18 @@ public class IngredientService {
     private final IngredientRepository ingredientRepository;
     private final CategoryRepository categoryRepository;
     private final UnitRepository unitRepository;
+    private final TenantRepository tenantRepository;
     private final AuthUtil authUtil;
     private final IngredientStockHistoryRepository ingredientHistoryRepository;
     private final CashFlowRepository cashFlowRepository;
 
     // ================= GET =================
 
-    public List<IngredientResponse> getAll() {
-        return ingredientRepository.findByIsDeletedFalse()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public PageResponse<IngredientResponse> getAll(Pageable pageable, String search) {
+        UUID tenantId = TenantContext.getTenantId();
+        String searchParam = (search != null && !search.isEmpty()) ? "%" + search.toLowerCase() + "%" : null;
+        Page<IngredientsEntity> page = ingredientRepository.findAllActive(tenantId, searchParam, pageable);
+        return PageResponse.of(page.map(this::toResponse));
     }
 
     public IngredientResponse getById(UUID id) {
@@ -48,15 +53,16 @@ public class IngredientService {
     // ================= CREATE =================
 
     public IngredientResponse create(IngredientRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
 
         IngredientsEntity existing = ingredientRepository
-                .findFirstByNameOrderByIdDesc(request.getName());
+                .findFirstByNameAndTenantIdOrderByIdDesc(request.getName(), tenantId);
 
         if (existing != null && !existing.getIsDeleted()) {
             throw new RuntimeException("Nama bahan baku sudah ada");
         }
 
-        CategoryEntity category = categoryRepository.findById(request.getCategoryId())
+        CategoryEntity category = categoryRepository.findByIdAndTenantId(request.getCategoryId(), tenantId)
                 .orElseThrow(() -> new RuntimeException("Kategori tidak ditemukan"));
 
         UnitsEntity unit = unitRepository.findById(request.getUnitId())
@@ -70,6 +76,7 @@ public class IngredientService {
         ingredient.setStockQuantity(BigDecimal.ZERO);
         ingredient.setPurchasePrice(BigDecimal.ZERO);
         ingredient.setAvgPurchasePrice(BigDecimal.ZERO);
+        ingredient.setTenant(tenantRepository.getReferenceById(tenantId));
         ingredient.setCreatedBy(authUtil.getCurrentUserEmail());
 
         ingredientRepository.save(ingredient);
@@ -80,10 +87,10 @@ public class IngredientService {
     // ================= UPDATE =================
 
     public IngredientResponse update(UUID id, UpdateIngredientRequest request) {
-
+        UUID tenantId = TenantContext.getTenantId();
         IngredientsEntity ingredient = findById(id);
 
-        CategoryEntity category = categoryRepository.findById(request.getCategoryId())
+        CategoryEntity category = categoryRepository.findByIdAndTenantId(request.getCategoryId(), tenantId)
                 .orElseThrow(() -> new RuntimeException("Kategori tidak ditemukan"));
 
         UnitsEntity newUnit = unitRepository.findById(request.getUnitId())
@@ -91,25 +98,14 @@ public class IngredientService {
 
         UnitsEntity oldUnit = ingredient.getUnit();
 
-        // 🔥 HANDLE CONVERSION (via UTIL)
         if (!oldUnit.getId().equals(newUnit.getId())) {
-
             if (!UnitConverter.canConvert(oldUnit.getSymbol(), newUnit.getSymbol())) {
                 throw new RuntimeException("Unit tidak bisa dikonversi");
             }
 
-            BigDecimal ratio = UnitConverter.getRatio(
-                    oldUnit.getSymbol(),
-                    newUnit.getSymbol()
-            );
-
-            ingredient.setStockQuantity(
-                    ingredient.getStockQuantity().multiply(ratio)
-            );
-
-            ingredient.setMinimumStock(
-                    ingredient.getMinimumStock().multiply(ratio)
-            );
+            BigDecimal ratio = UnitConverter.getRatio(oldUnit.getSymbol(), newUnit.getSymbol());
+            ingredient.setStockQuantity(ingredient.getStockQuantity().multiply(ratio));
+            ingredient.setMinimumStock(ingredient.getMinimumStock().multiply(ratio));
         }
 
         ingredient.setName(request.getName());
@@ -117,7 +113,6 @@ public class IngredientService {
         ingredient.setUnit(newUnit);
         ingredient.setMinimumStock(request.getMinimumStock());
 
-        // 🔥 last price (dipakai costing)
         if (request.getPurchasePrice() != null) {
             ingredient.setPurchasePrice(request.getPurchasePrice());
         }
@@ -135,13 +130,14 @@ public class IngredientService {
     public void delete(UUID id) {
         IngredientsEntity ingredient = findById(id);
         ingredient.setIsDeleted(true);
+        ingredient.setUpdatedBy(authUtil.getCurrentUserEmail());
         ingredientRepository.save(ingredient);
     }
 
     // ================= STOCK IN =================
 
     public IngredientResponse stockIn(UUID id, StockInRequest request) {
-
+        UUID tenantId = TenantContext.getTenantId();
         IngredientsEntity ingredient = findById(id);
 
         // 🔹 HISTORY
@@ -158,13 +154,12 @@ public class IngredientService {
         CashFlowEntity cashFlow = new CashFlowEntity();
         cashFlow.setType(CashFlowType.OUT);
         cashFlow.setCategory("Pembelian Bahan");
-        cashFlow.setAmount(
-                request.getPurchasePrice().multiply(request.getQuantity())
-        );
+        cashFlow.setAmount(request.getPurchasePrice().multiply(request.getQuantity()));
         cashFlow.setDescription("Pembelian " + ingredient.getName());
         cashFlow.setTransactionDate(LocalDate.now());
         cashFlow.setReferenceType("INGREDIENT");
         cashFlow.setReferenceId(ingredient.getId());
+        cashFlow.setTenant(tenantRepository.getReferenceById(tenantId));
 
         cashFlowRepository.save(cashFlow);
 
@@ -172,19 +167,16 @@ public class IngredientService {
         BigDecimal oldStock = ingredient.getStockQuantity();
         BigDecimal newStock = oldStock.add(request.getQuantity());
 
-        // 🔹 AVG PRICE (backup only)
+        // 🔹 AVG PRICE
         BigDecimal newAvgPrice;
         if (oldStock.compareTo(BigDecimal.ZERO) == 0) {
             newAvgPrice = request.getPurchasePrice();
         } else {
             BigDecimal oldTotal = oldStock.multiply(ingredient.getAvgPurchasePrice());
             BigDecimal newTotal = request.getQuantity().multiply(request.getPurchasePrice());
-
-            newAvgPrice = oldTotal.add(newTotal)
-                    .divide(newStock, 6, RoundingMode.HALF_UP);
+            newAvgPrice = oldTotal.add(newTotal).divide(newStock, 6, RoundingMode.HALF_UP);
         }
 
-        // 🔥 FINAL UPDATE
         ingredient.setStockQuantity(newStock);
         ingredient.setAvgPurchasePrice(newAvgPrice);
         ingredient.setPurchasePrice(request.getPurchasePrice());
@@ -197,7 +189,7 @@ public class IngredientService {
     // ================= HISTORY =================
 
     public List<IngredientHistoryResponse> getHistory(UUID id) {
-
+        UUID tenantId = TenantContext.getTenantId();
         findById(id);
 
         return ingredientHistoryRepository
@@ -219,7 +211,8 @@ public class IngredientService {
     // ================= HELPER =================
 
     private IngredientsEntity findById(UUID id) {
-        IngredientsEntity ingredient = ingredientRepository.findById(id)
+        UUID tenantId = TenantContext.getTenantId();
+        IngredientsEntity ingredient = ingredientRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new RuntimeException("Bahan baku tidak ditemukan"));
 
         if (ingredient.getIsDeleted()) {
@@ -238,8 +231,8 @@ public class IngredientService {
                 .unitSymbol(ingredient.getUnit().getSymbol())
                 .stockQuantity(ingredient.getStockQuantity())
                 .minimumStock(ingredient.getMinimumStock())
-                .avgPurchasePrice(ingredient.getAvgPurchasePrice()) // backup
-                .purchasePrice(ingredient.getPurchasePrice()) // 🔥 dipakai
+                .avgPurchasePrice(ingredient.getAvgPurchasePrice())
+                .purchasePrice(ingredient.getPurchasePrice())
                 .categoryId(ingredient.getCategory().getId())
                 .unitId(ingredient.getUnit().getId())
                 .build();

@@ -7,6 +7,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.math.BigDecimal;
 
 @Entity
@@ -14,6 +17,8 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 @NoArgsConstructor
+@SQLDelete(sql = "UPDATE units SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class UnitsEntity extends BaseEntity{
 
     @Column(nullable = false)
