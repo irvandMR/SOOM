@@ -1,0 +1,2 @@
+ALTER TABLE ingredients
+    ADD COLUMN IF NOT EXISTS purchase_price DECIMAL(15,3) DEFAULT 0;
