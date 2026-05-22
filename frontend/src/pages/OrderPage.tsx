@@ -57,7 +57,8 @@ export default function OrderPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const onPage = (event: any) => {
-    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
+    const pageNumber = Math.floor(event.first / event.rows)
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: pageNumber }))
   }
 
   const onSort = (event: any) => {

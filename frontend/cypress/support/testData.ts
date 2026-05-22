@@ -1,6 +1,6 @@
 export const credentials = {
-  email: 'rizky@gmail.com',
-  password: 'rizky123'
+  email: 'admin@soom.com',
+  password: 'adminsoom123'
 };
 
 export const ingredients = [

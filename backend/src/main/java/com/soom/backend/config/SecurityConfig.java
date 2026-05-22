@@ -4,6 +4,7 @@ import com.soom.backend.middleware.JwtAuthFilter;
 import com.soom.backend.security.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,6 +28,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    @Value("${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}")
+    private String corsAllowedOrigins;
 
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtAuthFilter jwtAuthFilter;
@@ -81,7 +85,7 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         // Izinkan request dari frontend React
-        config.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173"));
+        config.setAllowedOrigins(List.of(corsAllowedOrigins.split(",")));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
 
