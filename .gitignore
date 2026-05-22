@@ -1,0 +1,38 @@
+# --- ENV FILES ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+frontend/.env
+frontend/.env.local
+
+# --- JAVA / MAVEN ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/resources/archetype-resources/**
+!**/src/test/resources/archetype-resources/**
+*.class
+*.jar
+*.war
+*.ear
+*.tar.gz
+.mvn/maven-wrapper.properties
+
+# --- NODE / FRONTEND ---
+node_modules/
+dist/
+build/
+.eslintcache
+*.log
+
+# --- IDEs ---
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# --- TEMP FILES ---
+cd
+docker-compose
+/tmp/

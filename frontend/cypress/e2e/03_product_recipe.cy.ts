@@ -67,10 +67,11 @@ describe('Step 3: Product CRUD & Recipe Setup', () => {
     });
     cy.get('.p-dialog').should('not.exist');
     
-    // Temukan dan hapus
+    // Temukan dan hapus dari card grid
     cy.get('input[placeholder*="Cari nama produk"]').clear().type('Produk Sampah{enter}');
     cy.wait(500);
-    cy.get('td').contains('Produk Sampah', { matchCase: false }).closest('tr').within(() => {
+    // Find product card by name and click Hapus button inside it
+    cy.get('.product-card').contains('h3', 'Produk Sampah').closest('.product-card').within(() => {
       cy.contains('button', 'Hapus').click();
     });
     cy.get('.p-confirm-dialog').should('be.visible').within(() => {
@@ -88,7 +89,8 @@ describe('Step 3: Product CRUD & Recipe Setup', () => {
       cy.get('body').then(($body: any) => {
         // --- HAPUS JIKA SUDAH ADA (CLEAN SLATE) ---
         if ($body.text().includes(prod.name)) {
-          cy.get('td').contains(new RegExp(`^${prod.name}$`, 'i')).closest('tr').within(() => {
+          // Find product card by name and click Hapus button
+          cy.get('.product-card').contains('h3', new RegExp(`^${prod.name}$`, 'i')).closest('.product-card').within(() => {
             cy.contains('button', 'Hapus').click();
           });
           cy.get('.p-confirm-dialog').should('be.visible').within(() => {
@@ -132,7 +134,8 @@ describe('Step 3: Product CRUD & Recipe Setup', () => {
         cy.wait(600);
 
         // --- 2B. MASUKAN RESEP KE DALAM PRODUK ---
-        cy.get('td').contains(new RegExp(`^${prod.name}$`, 'i')).closest('tr').within(() => {
+        // Find product card and click Resep button
+        cy.get('.product-card').contains('h3', new RegExp(`^${prod.name}$`, 'i')).closest('.product-card').within(() => {
           cy.contains('button', 'Resep').click();
         });
         

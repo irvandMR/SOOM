@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { Trash2, Eye, ChefHat } from 'lucide-react'
 import type { Product, Recipe } from '../types/product.types'
 import { confirmDialog } from '../components/common/ui/ConfirmDialog'
 import PageHeader from '../components/common/ui/PageHeader'
-import Table from '../components/common/ui/Table'
 import Button from '../components/common/ui/Button'
 import FilterBar from '../components/common/ui/FilterBar'
+import Pagination from '../components/common/ui/Pagination'
 import DetailProductModal from '../components/product/detailProductModal'
 import RecipeManageModal from '../components/product/recipeManageModal'
 import AddProductModal from '../components/product/addProductModal'
+import ProductCard from '../components/product/ProductCard'
 import {
   useProducts,
   useProductRecipes,
@@ -64,7 +64,8 @@ export default function ProductPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const onPage = (event: any) => {
-    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: event.page }))
+    const pageNumber = Math.floor(event.first / event.rows)
+    setLazyParams(prev => ({ ...prev, first: event.first, rows: event.rows, page: pageNumber }))
   }
 
   const onSort = (event: any) => {
@@ -103,58 +104,7 @@ export default function ProductPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.lists() })
 
-  const columns = [
-    { header: 'Nama', field: 'name', sortable: true },
-    {
-      header: 'Tipe', field: 'type', sortable: true, body: (row: Product) => (
-        <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap', background: '#EEF0FB', color: '#5B6BD4' }}>
-          {typeLabel[row.type] ?? row.type}
-        </span>
-      )
-    },
-    {
-      header: 'Kategori', field: 'category.name', sortable: true, body: (row: Product) => (
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{row.categoryName}</span>
-      )
-    },
-    {
-      header: 'Versi Resep', body: (row: Product) => (
-        row.activeRecipeVersion
-          ? <span style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-              background: '#E8F5E9', color: '#2E7D32',
-            }}>
-              v{row.activeRecipeVersion}
-            </span>
-          : <span style={{ fontSize: 12, color: 'var(--muted)' }}>—</span>
-      )
-    },
-    {
-      header: 'Stok', field: 'stockQuantity', sortable: true, body: (row: Product) => (
-        <span style={{ fontWeight: 500 }}>
-          {row.stockQuantity} {row.stockUnitName ?? row.unitName}
-        </span>
-      )
-    },
-    {
-      header: 'Aksi', body: (row: Product) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Button label="Detail" icon={<Eye size={12} />} variant="secondary" size="small"
-            tooltip="Lihat Detail"
-            onClick={() => handleOpenDetail(row)}
-          />
-          <Button label="Resep" icon={<ChefHat size={12} />} variant="secondary" size="small"
-            tooltip="Kelola Resep"
-            onClick={() => handleOpenRecipe(row)}
-          />
-          <Button label="Hapus" icon={<Trash2 size={12} />} variant="danger" size="small"
-            tooltip="Hapus"
-            onClick={() => handleDelete(row.id)}
-          />
-        </div>
-      )
-    },
-  ]
+  // Card layout - removed table columns definition
 
   return (
     <div>
@@ -200,20 +150,64 @@ export default function ProductPage() {
         onRefresh={refresh}
       />
 
-      <Table
-        data={products}
-        columns={columns}
-        loading={isLoading}
-        emptyMessage="Belum ada produk"
-        lazy
-        totalRecords={totalRecords}
-        first={lazyParams.first}
-        rows={lazyParams.rows}
-        onPage={onPage}
-        onSort={onSort}
-        sortField={lazyParams.sortField}
-        sortOrder={lazyParams.sortOrder}
-      />
+      {/* Pagination Top */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Pagination
+          total={totalRecords}
+          rows={lazyParams.rows}
+          first={lazyParams.first}
+          onPageChange={(newFirst) => {
+            const pageNumber = Math.floor(newFirst / lazyParams.rows)
+            setLazyParams(prev => ({ ...prev, first: newFirst, page: pageNumber }))
+          }}
+          onRowsChange={(newRows) => {
+            setLazyParams(prev => ({ ...prev, rows: newRows, first: 0, page: 0 }))
+          }}
+        />
+      </div>
+
+      {/* Cards Grid */}
+      {isLoading ? (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 300,
+          color: 'var(--muted)',
+        }}>
+          Loading...
+        </div>
+      ) : products.length === 0 ? (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 300,
+          color: 'var(--muted)',
+          fontSize: 14,
+        }}>
+          Belum ada produk
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: 16,
+          marginBottom: 24,
+        }}>
+          {products.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onDetail={handleOpenDetail}
+              onRecipe={handleOpenRecipe}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
+
+      
 
       <AddProductModal
         visible={showAddModal}
